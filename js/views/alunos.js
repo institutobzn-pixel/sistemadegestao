@@ -41,6 +41,7 @@ Views.alunos = () => {
       </div>
       <div class="head-actions">
         <input class="search-input" id="busca-aluno" type="search" placeholder="Buscar por nome, CPF ou e-mail…" value="${U.esc(filtroAlunos)}">
+        <button class="btn" data-action="importarAlunos" title="Importar de planilha Google/Excel (CSV)">&#128196; Importar planilha</button>
         <button class="btn accent" data-action="novoAluno">+ Novo aluno</button>
       </div>
     </div>
@@ -428,4 +429,252 @@ Actions.removerMatricula = matId => {
     U.toast("Matrícula removida.");
     App.render();
   }
+};
+
+/* ================= importação de alunos por planilha (CSV) =================
+   Roda 100% no navegador — o arquivo não sai do computador. O usuário escolhe
+   de qual coluna vem cada campo (com palpites automáticos), confere a prévia e
+   importa. Colunas desconhecidas são ignoradas; campos ausentes ficam em branco.
+   Se a coluna de curso/turma for indicada, o aluno já é matriculado. */
+
+let impAlunos = null;
+
+/* campos do app + rótulo + palavras que ajudam a adivinhar a coluna */
+const CAMPOS_ALUNO = [
+  ["nome", "Nome *", [/nome\s*complet/i, /^nome$/i, /nome do aluno/i, /^aluno/i, /estudante/i, /participante/i]],
+  ["nascimento", "Data de nascimento", [/nascimento/i, /\bnasc\b/i, /data.*nasc/i, /dt.*nasc/i, /anivers/i]],
+  ["cpf", "CPF", [/cpf/i]],
+  ["telefone", "Telefone / celular", [/whats/i, /celular/i, /telefone/i, /contato/i, /\bfone\b/i, /\btel\b/i]],
+  ["email", "E-mail", [/e-?mail/i]],
+  ["endereco", "Endereço (rua)", [/endere/i, /logradouro/i, /^rua/i]],
+  ["bairro", "Bairro", [/bairro/i]],
+  ["cidade", "Cidade", [/cidade/i, /munic/i]],
+  ["cep", "CEP", [/cep/i]],
+  ["responsavel", "Responsável", [/respons/i, /^m[aã]e/i, /^pai/i, /filia/i]],
+  ["curso", "Curso/Turma (matricula o aluno)", [/curso/i, /turma/i, /oficina/i, /forma[çc][aã]o/i, /modalidade/i]],
+  ["observacoes", "Observações", [/observa/i, /\bobs\b/i, /coment/i]]
+];
+
+/* lê um CSV respeitando aspas, quebras de linha dentro de aspas e ; ou , */
+function parseCSVAlunos(texto) {
+  texto = String(texto || "").replace(/^﻿/, "");
+  const primeira = texto.split(/\r?\n/)[0] || "";
+  const sep = (primeira.split(";").length > primeira.split(",").length) ? ";" : ",";
+  const linhas = [];
+  let campo = "", linha = [], dentro = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (dentro) {
+      if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else dentro = false; }
+      else campo += c;
+    } else {
+      if (c === '"') dentro = true;
+      else if (c === sep) { linha.push(campo); campo = ""; }
+      else if (c === '\n') { linha.push(campo); linhas.push(linha); linha = []; campo = ""; }
+      else if (c === '\r') { /* ignora */ }
+      else campo += c;
+    }
+  }
+  if (campo.length || linha.length) { linha.push(campo); linhas.push(linha); }
+  const limpas = linhas.filter(l => l.some(x => (x || "").trim() !== ""));
+  const header = (limpas.shift() || []).map(h => (h || "").trim());
+  return { header, linhas: limpas };
+}
+
+function mapearAutoAlunos(header) {
+  const usados = new Set();
+  const mapa = {};
+  for (const [campo, , regexes] of CAMPOS_ALUNO) {
+    let idx = -1;
+    for (const rx of regexes) {
+      idx = header.findIndex((h, i) => !usados.has(i) && rx.test(h));
+      if (idx >= 0) break;
+    }
+    mapa[campo] = idx;
+    if (idx >= 0) usados.add(idx);
+  }
+  return mapa;
+}
+
+/* aceita 03/07/2010, 2010-07-03, 3-7-2010, etc. */
+function parseDataFlexAluno(s) {
+  const t = String(s || "").trim();
+  if (!t) return "";
+  let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (m) {
+    let y = m[3];
+    if (y.length === 2) y = (parseInt(y, 10) > 30 ? "19" : "20") + y;
+    return `${y}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+  m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  return "";
+}
+
+function chaveAlunoImport(nome, cpf, nasc) {
+  const cpfd = String(cpf || "").replace(/\D/g, "");
+  return String(nome || "").trim().toLowerCase() + "|" + (cpfd || nasc || "");
+}
+
+function acharOuCriarCursoTurma(nomeCurso) {
+  const nc = String(nomeCurso || "").trim();
+  let curso = Store.col("cursos").find(c => (c.nome || "").trim().toLowerCase() === nc.toLowerCase());
+  let cursoCriado = false, turmaCriada = false;
+  if (!curso) {
+    curso = Store.upsert("cursos", {
+      nome: nc, ementa: "", corIndex: (Store.col("cursos").length % 8) + 1, status: "ativo",
+      modulos: [], modalidade: "curso", tipoCurso: "gratuito", valor: 0, cobranca: ""
+    });
+    cursoCriado = true;
+  }
+  let turma = Store.col("turmas").find(t => t.cursoId === curso.id);
+  if (!turma) {
+    turma = Store.upsert("turmas", {
+      cursoId: curso.id, professorId: "", nome: "Turma importada", dataInicio: "", dataFim: "",
+      horario: "", local: "", vagas: 0, status: "em andamento"
+    });
+    turmaCriada = true;
+  }
+  return { turma, cursoCriado, turmaCriada };
+}
+
+Actions.importarAlunos = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".csv,text/csv,text/plain";
+  input.onchange = () => {
+    const arq = input.files[0];
+    if (!arq) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const { header, linhas } = parseCSVAlunos(fr.result);
+        if (!header.length || !linhas.length) { alert("A planilha parece vazia ou sem cabeçalho.\nDica: exporte do Google Sheets em Arquivo → Fazer download → CSV."); return; }
+        impAlunos = { header, linhas };
+        abrirMapeamentoAlunos();
+      } catch (e) {
+        alert("Não consegui ler o arquivo: " + (e.message || e));
+      }
+    };
+    fr.readAsText(arq, "utf-8");
+  };
+  input.click();
+};
+
+function abrirMapeamentoAlunos() {
+  const { header } = impAlunos;
+  const auto = impAlunos.mapa || mapearAutoAlunos(header);
+  const optCols = sel => ['<option value="-1">— ignorar —</option>']
+    .concat(header.map((h, i) => `<option value="${i}" ${i === sel ? "selected" : ""}>${U.esc(h || ("Coluna " + (i + 1)))}</option>`))
+    .join("");
+  const linhasMap = CAMPOS_ALUNO.map(([campo, rotulo]) => `
+    <div class="field">
+      <label for="map-${campo}">${rotulo}</label>
+      <select id="map-${campo}">${optCols(auto[campo] == null ? -1 : auto[campo])}</select>
+    </div>`).join("");
+  App.abrirModal("Importar alunos — conferir colunas", `
+    <p style="font-size:0.9rem; margin-bottom:12px;">
+      Encontrei <strong>${impAlunos.linhas.length} ${U.plural(impAlunos.linhas.length, "linha", "linhas")}</strong>
+      e ${header.length} colunas. Confira de qual coluna vem cada informação — já preenchi os palpites.
+      O que não usar, deixe em <em>“ignorar”</em>.
+    </p>
+    <div class="form-grid">${linhasMap}</div>
+    <div class="form-actions">
+      <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
+      <button type="button" class="btn accent" data-modal-action="preverImportAlunos">Pré-visualizar</button>
+    </div>`);
+}
+
+Actions.preverImportAlunos = () => {
+  if (!impAlunos) return;
+  const mapa = {};
+  for (const [campo] of CAMPOS_ALUNO) {
+    const sel = document.getElementById("map-" + campo);
+    mapa[campo] = sel ? parseInt(sel.value, 10) : -1;
+  }
+  if (mapa.nome < 0) { alert("Escolha qual coluna tem o NOME do aluno — é obrigatório."); return; }
+  impAlunos.mapa = mapa;
+
+  const val = (row, campo) => { const i = mapa[campo]; return (i >= 0 && i < row.length) ? String(row[i] || "").trim() : ""; };
+  const comNome = impAlunos.linhas.filter(r => val(r, "nome"));
+  const amostra = comNome.slice(0, 5).map(r => {
+    const nasc = parseDataFlexAluno(val(r, "nascimento"));
+    return `<tr>
+      <td>${U.esc(val(r, "nome"))}</td>
+      <td>${nasc ? U.fmtData(nasc) : "—"}</td>
+      <td>${U.esc(val(r, "telefone") || "—")}</td>
+      <td>${U.esc(val(r, "curso") || "—")}</td></tr>`;
+  }).join("");
+
+  App.abrirModal("Importar alunos — prévia", `
+    <p style="font-size:0.9rem; margin-bottom:10px;">
+      Vou importar <strong>${comNome.length} ${U.plural(comNome.length, "aluno", "alunos")}</strong>. Amostra dos primeiros:
+    </p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nome</th><th>Nascimento</th><th>Telefone</th><th>Curso/Turma</th></tr></thead>
+      <tbody>${amostra}</tbody>
+    </table></div>
+    ${mapa.curso >= 0 ? `<p style="font-size:0.82rem; color:var(--text-muted); margin-top:8px;">Cada aluno será matriculado na turma do curso indicado (o curso/turma é criado se ainda não existir).</p>` : ""}
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Alunos repetidos (mesmo nome + CPF/nascimento) não são duplicados. Você pode excluir alunos depois, um a um.</p>
+    <div class="form-actions">
+      <button type="button" class="btn ghost" data-modal-action="voltarMapeamentoAlunos">Voltar</button>
+      <button type="button" class="btn accent" data-modal-action="confirmarImportAlunos">Importar ${comNome.length}</button>
+    </div>`);
+};
+
+Actions.voltarMapeamentoAlunos = () => abrirMapeamentoAlunos();
+
+Actions.confirmarImportAlunos = () => {
+  if (!impAlunos || !impAlunos.mapa) return;
+  const { linhas, mapa } = impAlunos;
+  const val = (row, campo) => { const i = mapa[campo]; return (i >= 0 && i < row.length) ? String(row[i] || "").trim() : ""; };
+  const idxExist = new Map();
+  for (const a of Store.col("alunos")) idxExist.set(chaveAlunoImport(a.nome, a.cpf, a.nascimento), a.id);
+
+  let novos = 0, reuse = 0, mats = 0, cursosC = 0, turmasC = 0, pulados = 0;
+  try {
+    for (const row of linhas) {
+      const nome = val(row, "nome");
+      if (!nome) { pulados++; continue; }
+      const nascimento = parseDataFlexAluno(val(row, "nascimento"));
+      const cpf = val(row, "cpf");
+      const chave = chaveAlunoImport(nome, cpf, nascimento);
+      let alunoId = idxExist.get(chave);
+      if (!alunoId) {
+        const a = Store.upsert("alunos", {
+          nome, nascimento, cpf, telefone: val(row, "telefone"), email: val(row, "email"),
+          endereco: val(row, "endereco"), bairro: val(row, "bairro"), cidade: val(row, "cidade"), cep: val(row, "cep"),
+          responsavel: val(row, "responsavel"), encaminhamento: "", atingidoEnchente: "", impactoEnchentes: "",
+          rendaFamiliar: "", beneficios: "", moradiaAtual: "", necessidades: "", observacoes: val(row, "observacoes"), termos: []
+        });
+        alunoId = a.id;
+        idxExist.set(chave, alunoId);
+        novos++;
+      } else reuse++;
+
+      const nomeCurso = val(row, "curso");
+      if (nomeCurso) {
+        const { turma, cursoCriado, turmaCriada } = acharOuCriarCursoTurma(nomeCurso);
+        if (cursoCriado) cursosC++;
+        if (turmaCriada) turmasC++;
+        if (!Store.matriculasDoAluno(alunoId).some(m => m.turmaId === turma.id)) {
+          Store.upsert("matriculas", { alunoId, turmaId: turma.id, status: "cursando", data: U.hojeISO(), bolsa: false });
+          mats++;
+        }
+      }
+    }
+  } catch (e) {
+    alert("Não foi possível concluir a importação: " + (e.message || e) + "\nO armazenamento pode estar cheio.");
+    return;
+  }
+
+  impAlunos = null;
+  App.fecharModal();
+  App.render();
+  const extra = [
+    mats ? `${mats} ${U.plural(mats, "matrícula", "matrículas")}` : "",
+    cursosC ? `${cursosC} ${U.plural(cursosC, "curso criado", "cursos criados")}` : "",
+    reuse ? `${reuse} já existiam` : ""
+  ].filter(Boolean).join(" · ");
+  U.toast(`${novos} ${U.plural(novos, "aluno importado", "alunos importados")}${extra ? " · " + extra : ""}.`);
 };
