@@ -11,7 +11,7 @@ const AS = {
 function subnavAS(ativa) {
   const abas = [
     ["", "Atendidos"], ["espera", "Lista de espera"],
-    ["agenda", "Agenda interna"], ["profissionais", "Profissionais"],
+    ["agenda", "Agenda interna"],
     ["legislacao", "Legislação e documentos"]
   ];
   return `<div class="subtabs">${abas.map(([slug, rotulo]) =>
@@ -24,7 +24,6 @@ Views.assistencia = sub => {
   if (!AS.logado()) return viewLoginAS();
   if (sub === "espera") return viewEsperaAS();
   if (sub === "agenda") return viewAgendaAS();
-  if (sub === "profissionais") return viewProfSociais();
   if (sub === "legislacao") return viewLegislacaoAS();
   return viewAssistidosAS();
 };
@@ -573,14 +572,14 @@ function viewProfSociais() {
   return `
     <div class="page-head">
       <div>
-        <h2>Profissionais da assistência</h2>
+        <h2>Assistente Social</h2>
         <p>Equipe da assistência social: assistentes sociais e apoio, com registro, contato e documentos.</p>
       </div>
       <div class="head-actions">
         <button class="btn accent" data-action="novoProfSocial">+ Novo profissional</button>
       </div>
     </div>
-    ${subnavAS("profissionais")}
+    ${subnavEquipe("assistente-social")}
     ${profs.length ? `<div class="grid-cards">${cards}</div>`
       : `<div class="panel"><div class="empty-note">Nenhum profissional cadastrado ainda.</div></div>`}
   `;

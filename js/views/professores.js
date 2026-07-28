@@ -9,6 +9,7 @@ function subnavEquipe(ativa) {
   return `<div class="subtabs">
     <a href="#/professores" class="${ativa === "professores" ? "active" : ""}">Professores</a>
     <a href="#/professores/equipe" class="${ativa === "equipe" ? "active" : ""}">Funcionários e colaboradores</a>
+    <a href="#/professores/assistente-social" class="${ativa === "assistente-social" ? "active" : ""}">Assistente Social</a>
   </div>`;
 }
 
@@ -120,6 +121,7 @@ function linksArquivos(p) {
 
 Views.professores = param => {
   if (param === "equipe") return viewEquipe();
+  if (param === "assistente-social") return viewProfSociais();
   const profs = U.ordenarPorNome(Store.col("professores"));
   const cards = profs.map((p, i) => {
     const turmas = Store.col("turmas").filter(t => t.professorId === p.id);
