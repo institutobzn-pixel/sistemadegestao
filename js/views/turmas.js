@@ -40,6 +40,7 @@ Views.turmas = () => {
         <p>Cada turma é uma edição de um curso, com professor, período, horário e vagas.</p>
       </div>
       <div class="head-actions">
+        <button class="btn" data-action="importarInscritos" title="Importar lista de inscritos de uma planilha (CSV)">&#128196; Importar inscritos</button>
         <button class="btn accent" data-action="novaTurma">+ Nova turma</button>
       </div>
     </div>
@@ -140,3 +141,88 @@ Actions.excluirTurma = id => {
   }
 };
 Actions.irChamada = id => { location.hash = "#/chamada/" + id; };
+
+/* ============ importar inscritos por curso (matricula numa turma) ============ */
+
+let impInscritos = null;
+
+Actions.importarInscritos = () => {
+  const turmas = Store.col("turmas").filter(t => t.status !== "cancelada");
+  if (!turmas.length) { U.toast("Cadastre uma turma antes de importar inscritos."); return; }
+  const opts = turmas.map(t => {
+    const c = Store.get("cursos", t.cursoId);
+    return `<option value="${t.id}">${U.esc((c ? c.nome : "?") + " — " + t.nome)}</option>`;
+  }).join("");
+  App.abrirModal("Importar inscritos por curso", `
+    <p style="font-size:0.9rem; margin-bottom:12px;">
+      Escolha a turma e envie a planilha (CSV) com a lista de inscritos.
+      Basta ter uma coluna com o <strong>nome</strong> — as demais (telefone, CPF, e-mail…) são reconhecidas se existirem.
+      Cada pessoa é matriculada na turma escolhida.
+    </p>
+    <div class="field">
+      <label for="ins-turma">Turma</label>
+      <select id="ins-turma">${opts}</select>
+    </div>
+    <div class="field">
+      <label for="ins-file">Arquivo CSV</label>
+      <input id="ins-file" type="file" accept=".csv,text/csv,text/plain">
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
+      <button type="button" class="btn accent" data-modal-action="processarInscritos">Importar</button>
+    </div>`);
+};
+
+Actions.processarInscritos = () => {
+  const turmaId = document.getElementById("ins-turma").value;
+  const fileEl = document.getElementById("ins-file");
+  const arq = fileEl && fileEl.files[0];
+  if (!arq) { alert("Escolha o arquivo CSV."); return; }
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const { header, linhas } = CSV.parse(fr.result);
+      if (!header.length || !linhas.length) { alert("A planilha parece vazia."); return; }
+      const acha = regs => { for (const r of regs) { const i = header.findIndex(h => r.test(h)); if (i >= 0) return i; } return -1; };
+      let iNome = acha([/nome\s*complet/i, /^nome$/i, /aluno/i, /estudante/i, /participante/i, /inscrit/i]);
+      if (iNome < 0) iNome = 0; // sem cabeçalho claro: usa a 1ª coluna
+      const iTel = acha([/whats/i, /celular/i, /telefone/i, /contato/i, /\bfone\b/i]);
+      const iCpf = acha([/cpf/i]);
+      const iEmail = acha([/e-?mail/i]);
+      const iNasc = acha([/nascimento/i, /\bnasc\b/i, /anivers/i]);
+
+      const idxExist = new Map();
+      for (const a of Store.col("alunos")) idxExist.set(CSV.normNome(a.nome), a);
+      const jaNaTurma = new Set(Store.matriculasDaTurma(turmaId).map(m => m.alunoId));
+
+      let novos = 0, reuse = 0, mats = 0, pulados = 0;
+      for (const row of linhas) {
+        const nome = (row[iNome] || "").trim();
+        if (!nome) { pulados++; continue; }
+        let aluno = idxExist.get(CSV.normNome(nome));
+        if (!aluno) {
+          aluno = Store.upsert("alunos", {
+            nome, nascimento: iNasc >= 0 ? CSV.parseDataFlex(row[iNasc]) : "", cpf: iCpf >= 0 ? (row[iCpf] || "").trim() : "",
+            telefone: iTel >= 0 ? (row[iTel] || "").trim() : "", email: iEmail >= 0 ? (row[iEmail] || "").trim() : "",
+            endereco: "", bairro: "", cidade: "", cep: "", responsavel: "", encaminhamento: "",
+            atingidoEnchente: "", impactoEnchentes: "", rendaFamiliar: "", beneficios: "", moradiaAtual: "",
+            necessidades: "", observacoes: "", termos: []
+          });
+          idxExist.set(CSV.normNome(nome), aluno);
+          novos++;
+        } else reuse++;
+        if (!jaNaTurma.has(aluno.id)) {
+          Store.upsert("matriculas", { alunoId: aluno.id, turmaId, status: "cursando", data: U.hojeISO(), bolsa: false });
+          jaNaTurma.add(aluno.id);
+          mats++;
+        }
+      }
+      App.fecharModal();
+      App.render();
+      U.toast(`${mats} ${U.plural(mats, "inscrito matriculado", "inscritos matriculados")}${novos ? ` · ${novos} ${U.plural(novos, "aluno novo", "alunos novos")}` : ""}${reuse ? ` · ${reuse} já existiam` : ""}.`);
+    } catch (e) {
+      alert("Não foi possível importar: " + (e.message || e));
+    }
+  };
+  fr.readAsText(arq, "utf-8");
+};
