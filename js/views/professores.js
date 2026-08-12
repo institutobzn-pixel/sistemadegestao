@@ -196,8 +196,8 @@ function abrirFormProf(p) {
         </div>
         <div class="form-section">Documentos e dados pessoais</div>
         ${camposPessoaisHTML(p, "fp")}
-        ${App.nivel() === "admin" ? `
-        <div class="form-section">Acesso à "Área do professor" (somente admin altera)</div>
+        ${App.ehAdmin() ? `
+        <div class="form-section">Acesso à "Área do professor" (somente admin/presidência altera)</div>
         <div class="field">
           <label for="fp-pin">PIN de acesso (4 a 6 dígitos)</label>
           <input id="fp-pin" name="pinNovo" type="password" inputmode="numeric" minlength="4" maxlength="6"

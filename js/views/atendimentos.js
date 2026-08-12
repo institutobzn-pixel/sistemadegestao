@@ -299,8 +299,8 @@ function abrirFormProfSaude(p) {
           <label for="fps-email">E-mail</label>
           <input id="fps-email" name="email" type="email" value="${U.esc(p.email)}">
         </div>
-        ${App.nivel() === "admin" ? `
-        <div class="form-section">Acesso à "Minha área" (somente admin altera)</div>
+        ${App.ehAdmin() ? `
+        <div class="form-section">Acesso à "Minha área" (somente admin/presidência altera)</div>
         <div class="field">
           <label for="fps-pin">PIN de acesso (4 a 6 dígitos)</label>
           <input id="fps-pin" name="pinNovo" type="password" inputmode="numeric" minlength="4" maxlength="6"

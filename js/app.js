@@ -58,11 +58,14 @@ const App = (() => {
   const CHAVE_NIVEL = "bzn-nivel";
   const nivel = () => sessionStorage.getItem(CHAVE_NIVEL) || "";
 
-  /* permissões por nível. Hoje: admin e secretaria têm acesso completo
-     (só o admin gerencia senhas/PINs). */
+  /* admin e presidente têm acesso total (inclusive Logins e Financeiro) */
+  const ehAdmin = () => { const n = nivel(); return n === "admin" || n === "presidente"; };
+
+  /* permissões por nível: admin, presidente e secretaria têm acesso completo
+     à operação (só admin/presidente gerenciam senhas/PINs). */
   function rotaPermitida() {
     const n = nivel();
-    return n === "admin" || n === "secretaria";
+    return n === "admin" || n === "presidente" || n === "secretaria";
   }
 
   function render() {
@@ -88,14 +91,14 @@ const App = (() => {
     }
     if (btnSair) {
       btnSair.hidden = !nivel();
-      btnSair.textContent = nivel() ? "Sair (" + ({ admin: "admin", secretaria: "secretaria" }[nivel()] || "") + ")" : "Sair";
+      btnSair.textContent = nivel() ? "Sair (" + ({ admin: "admin", presidente: "presidente", secretaria: "secretaria" }[nivel()] || "") + ")" : "Sair";
     }
     const btnSeg = document.getElementById("btn-seguranca");
-    if (btnSeg) btnSeg.hidden = nivel() !== "admin";
+    if (btnSeg) btnSeg.hidden = !ehAdmin();
 
     /* versões dos botões dentro do menu ☰ (celular) */
     const navLogins = document.getElementById("nav-logins");
-    if (navLogins) navLogins.hidden = nivel() !== "admin";
+    if (navLogins) navLogins.hidden = !ehAdmin();
     const navSair = document.getElementById("nav-sair");
     if (navSair) navSair.hidden = !nivel();
 
@@ -142,6 +145,7 @@ const App = (() => {
             <label for="portao-perfil">Perfil</label>
             <select id="portao-perfil">
               <option value="admin">Administração</option>
+              <option value="presidente">Presidência</option>
               <option value="secretaria">Secretaria</option>
             </select>
           </div>`}
@@ -342,5 +346,5 @@ const App = (() => {
   window.addEventListener("hashchange", render);
   window.addEventListener("DOMContentLoaded", render);
 
-  return { render, abrirModal, fecharModal, nivel };
+  return { render, abrirModal, fecharModal, nivel, ehAdmin };
 })();

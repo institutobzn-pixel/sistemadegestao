@@ -122,7 +122,7 @@ const Store = (() => {
   /* senhas de acesso por nível (organizacional — os dados seguem no navegador)
      admin: gerencia tudo, inclusive as senhas; secretaria: operação completa;
      usuario: visualização básica. A senha antiga (senhaGeralHash) vira a de admin. */
-  const CAMPO_SENHA = { admin: "senhaGeralHash", secretaria: "senhaSecretariaHash" };
+  const CAMPO_SENHA = { admin: "senhaGeralHash", presidente: "senhaPresidenteHash", secretaria: "senhaSecretariaHash" };
 
   function temSenha(nivel) { return !!db.config[CAMPO_SENHA[nivel]]; }
   function definirSenha(nivel, senha) {

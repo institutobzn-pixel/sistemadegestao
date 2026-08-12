@@ -5,7 +5,7 @@
 
 const CHAVE_AS_LOGADO = "bzn-as-logado";
 const AS = {
-  logado: () => sessionStorage.getItem(CHAVE_AS_LOGADO) === "1" || App.nivel() === "admin"
+  logado: () => sessionStorage.getItem(CHAVE_AS_LOGADO) === "1" || App.ehAdmin()
 };
 
 function subnavAS(ativa) {
@@ -111,7 +111,7 @@ function viewAssistidosAS() {
         <p>Cadastro das pessoas atendidas, em ordem alfabética. Clique para abrir a ficha.</p>
       </div>
       <div class="head-actions">
-        ${App.nivel() !== "admin" ? `<button class="btn ghost" data-action="sairAS">Sair da assistência</button>` : ""}
+        ${!App.ehAdmin() ? `<button class="btn ghost" data-action="sairAS">Sair da assistência</button>` : ""}
         <input class="search-input" id="busca-assistido" type="search" placeholder="Buscar por nome, CPF ou telefone…" value="${U.esc(filtroAssistidos)}">
         <button class="btn accent" data-action="novoAssistido">+ Novo atendido</button>
       </div>

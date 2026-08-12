@@ -103,11 +103,11 @@ Views.relatorios = () => {
         <button class="btn" data-action="backupExportar">Exportar backup (.json)</button>
         <button class="btn ghost" data-action="backupImportar">Importar backup</button>
         <input type="file" id="arquivo-backup" accept=".json,application/json" hidden>
-        ${App.nivel() === "admin" ? `<button class="btn danger" data-action="apagarTudo">Apagar todos os dados</button>` : ""}
+        ${App.ehAdmin() ? `<button class="btn danger" data-action="apagarTudo">Apagar todos os dados</button>` : ""}
       </div>
     </div>
 
-    ${App.nivel() === "admin" ? `
+    ${App.ehAdmin() ? `
     <div class="panel">
       <h3>Segurança e logins</h3>
       <p class="panel-sub">Somente o administrador cria e troca as senhas dos perfis. Os PINs de professores e profissionais são definidos nos respectivos cadastros.</p>
@@ -229,7 +229,7 @@ function painelNuvem() {
 }
 
 Actions.nuvemConfig = () => {
-  if (App.nivel() !== "admin") { U.toast("Apenas o administrador configura a nuvem."); return; }
+  if (!App.ehAdmin()) { U.toast("Apenas o administrador configura a nuvem."); return; }
   const urlAtual = (typeof Nuvem !== "undefined" && Nuvem.configurada()) ? Nuvem.endereco() : "";
   App.abrirModal("Conectar à nuvem", `
     <p style="font-size:0.9rem; margin-bottom:12px;">
@@ -323,10 +323,10 @@ Actions.backupImportar = () => {
 /* ---------------- página Segurança e logins (somente admin) ---------------- */
 
 Views.seguranca = () => {
-  if (App.nivel() !== "admin") {
+  if (!App.ehAdmin()) {
     return `<div class="panel" style="max-width:440px; margin:40px auto 0;">
-      <div class="empty-note">Somente o <strong>administrador</strong> acessa a área de segurança.<br>
-      Entre com o perfil Administração para gerenciar senhas e PINs.</div></div>`;
+      <div class="empty-note">Somente o <strong>administrador</strong> ou a <strong>presidência</strong> acessam a área de segurança.<br>
+      Entre com o perfil Administração ou Presidência para gerenciar senhas e PINs.</div></div>`;
   }
   const item = (titulo, descricao, botoes) => `
     <div class="panel">
@@ -363,6 +363,10 @@ Views.seguranca = () => {
       "A senha principal do sistema. Guarde em local seguro — quem a tem controla todos os acessos.",
       `<button class="btn" data-action="senhaPerfil" data-id="admin">Trocar senha do admin</button>`)}
 
+    ${item("Senha da presidência",
+      `Acesso total, igual ao administrador (todas as áreas, Financeiro e esta página de logins). ${Store.temSenha("presidente") ? "<strong>Status: criada ✓</strong>" : "<strong>Status: ainda não criada</strong>"}`,
+      `<button class="btn accent" data-action="senhaPerfil" data-id="presidente">${Store.temSenha("presidente") ? "Trocar" : "Criar"} senha da presidência</button>`)}
+
     ${item("Pergunta de segurança",
       `Protege a recuperação de senha na tela de entrada: quem clicar em "Esqueci a senha" precisa acertar a resposta. ${Store.temPerguntaSeguranca() ? `<strong>Status: cadastrada ✓</strong> — "${U.esc(Store.perguntaSeguranca())}"` : "<strong>Status: não cadastrada — recomendado criar</strong>"}`,
       `<button class="btn accent" data-action="perguntaSeguranca">${Store.temPerguntaSeguranca() ? "Trocar" : "Cadastrar"} pergunta de segurança</button>`)}
@@ -394,6 +398,7 @@ Views.seguranca = () => {
         <thead><tr><th>Perfil</th><th>Como entra</th><th>O que vê</th></tr></thead>
         <tbody>
           <tr><td><span class="pill info">Admin</span></td><td>Perfil "Administração" + senha</td><td>Tudo, inclusive esta página e o Financeiro</td></tr>
+          <tr><td><span class="pill info">Presidência</span></td><td>Perfil "Presidência" + senha</td><td>Acesso total, igual ao admin</td></tr>
           <tr><td><span class="pill ok">Secretaria</span></td><td>Perfil "Secretaria" + senha</td><td>Operação completa, exceto logins e Financeiro</td></tr>
           <tr><td><span class="pill warn">Gestor financeiro</span></td><td>Aba Financeiro + PIN</td><td>Somente o Financeiro</td></tr>
           <tr><td><span class="pill muted">Professor</span></td><td>"Sou professor" + nome + PIN</td><td>Somente as turmas e alunos dele</td></tr>
@@ -408,8 +413,8 @@ Views.seguranca = () => {
 /* criar/trocar senha de um perfil. Estar logado como admin já é a autorização
    (não pedimos a senha atual de novo — evita ficar preso se ela for esquecida). */
 Actions.senhaPerfil = perfil => {
-  if (App.nivel() !== "admin") { U.toast("Apenas o administrador altera senhas."); return; }
-  const rotulo = { admin: "do administrador", secretaria: "da secretaria" }[perfil];
+  if (!App.ehAdmin()) { U.toast("Apenas o administrador ou a presidência alteram senhas."); return; }
+  const rotulo = { admin: "do administrador", presidente: "da presidência", secretaria: "da secretaria" }[perfil];
   const nova = prompt(`Digite a nova senha ${rotulo} (mínimo 4 caracteres):`);
   if (nova === null) return;
   if (nova.trim().length < 4) { alert("A nova senha deve ter pelo menos 4 caracteres."); return; }
@@ -422,7 +427,7 @@ Actions.senhaPerfil = perfil => {
 };
 
 Actions.perguntaSeguranca = () => {
-  if (App.nivel() !== "admin") { U.toast("Apenas o administrador altera isto."); return; }
+  if (!App.ehAdmin()) { U.toast("Apenas o administrador altera isto."); return; }
   const pergunta = prompt("Pergunta de segurança:\n(ex.: Qual o nome do seu primeiro cachorro?)", Store.perguntaSeguranca());
   if (pergunta === null) return;
   if (!pergunta.trim()) { alert("Digite uma pergunta."); return; }
@@ -435,7 +440,7 @@ Actions.perguntaSeguranca = () => {
 };
 
 Actions.pinAssistencia = () => {
-  if (App.nivel() !== "admin") { U.toast("Apenas o administrador altera o PIN."); return; }
+  if (!App.ehAdmin()) { U.toast("Apenas o administrador altera o PIN."); return; }
   const pin = prompt("Novo PIN da assistência social (4 a 6 dígitos):");
   if (pin === null) return;
   if (!/^\d{4,6}$/.test(pin.trim())) { alert("O PIN deve ter de 4 a 6 dígitos numéricos."); return; }
@@ -445,7 +450,7 @@ Actions.pinAssistencia = () => {
 };
 
 Actions.pinFinanceiro = () => {
-  if (App.nivel() !== "admin") { U.toast("Apenas o administrador altera o PIN."); return; }
+  if (!App.ehAdmin()) { U.toast("Apenas o administrador altera o PIN."); return; }
   const pin = prompt("Novo PIN do gestor financeiro (4 a 6 dígitos):");
   if (pin === null) return;
   if (!/^\d{4,6}$/.test(pin.trim())) { alert("O PIN deve ter de 4 a 6 dígitos numéricos."); return; }

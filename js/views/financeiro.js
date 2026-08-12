@@ -6,7 +6,7 @@
 const CHAVE_FIN_LOGADO = "bzn-fin-logado";
 
 const Fin = {
-  logado: () => sessionStorage.getItem(CHAVE_FIN_LOGADO) === "1" || App.nivel() === "admin"
+  logado: () => sessionStorage.getItem(CHAVE_FIN_LOGADO) === "1" || App.ehAdmin()
 };
 
 let filtroFin = { ano: String(new Date().getFullYear()), mes: 0 };
@@ -97,7 +97,7 @@ Views.financeiro = sub => {
         <p>Extrato SICOOB, vendas e assinaturas da Guru e lançamentos manuais — categorize e exporte para prestação de contas.</p>
       </div>
       <div class="head-actions">
-        ${App.nivel() !== "admin" ? `<button class="btn ghost" data-action="sairFin">Sair do financeiro</button>` : ""}
+        ${!App.ehAdmin() ? `<button class="btn ghost" data-action="sairFin">Sair do financeiro</button>` : ""}
         <button class="btn ghost" data-action="csvFinanceiro">Exportar planilha</button>
         <button class="btn ghost" data-action="imprimir">Imprimir / PDF</button>
       </div>
