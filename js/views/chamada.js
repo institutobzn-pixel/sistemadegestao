@@ -22,6 +22,8 @@ Views.chamada = turmaIdParam => {
 
   let listaAlunos = "";
   let historicoHTML = "";
+  let aulaJaExiste = false;
+  let totalAulas = 0;
 
   if (turmaSel) {
     const mats = Store.matriculasDaTurma(turmaSel.id).filter(m => m.status === "cursando" || m.status === "concluido");
@@ -30,6 +32,7 @@ Views.chamada = turmaIdParam => {
     // chamada já registrada nesta data?
     const existente = Store.col("chamadas").find(c => c.turmaId === turmaSel.id && c.data === chamadaAtual.data);
     const presencas = existente ? existente.presencas : chamadaAtual.presencas;
+    aulaJaExiste = !!existente;
 
     listaAlunos = alunos.length ? alunos.map(a => {
       const marcado = presencas[a.id];
@@ -55,6 +58,7 @@ Views.chamada = turmaIdParam => {
     const historico = Store.col("chamadas")
       .filter(c => c.turmaId === turmaSel.id)
       .sort((a, b) => b.data.localeCompare(a.data));
+    totalAulas = historico.length;
     historicoHTML = historico.length ? `
       <div class="table-wrap"><table>
         <thead><tr><th>Data</th><th>Conteúdo</th><th>Presentes</th><th></th></tr></thead>
@@ -96,26 +100,36 @@ Views.chamada = turmaIdParam => {
           <label for="ch-data">Data da aula</label>
           <input id="ch-data" type="date" value="${U.esc(chamadaAtual.data)}">
         </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn ghost" data-action="novaAula" title="Começar uma aula em outra data">+ Nova aula (outra data)</button>
+        </div>
         <div class="field full">
           <label for="ch-cont">Conteúdo da aula (opcional)</label>
           <input id="ch-cont" placeholder="ex.: Módulo 3 — Planejamento de conteúdo" value="${U.esc(chamadaAtual.conteudo)}">
         </div>
       </div>
+      <p style="font-size:0.82rem; color:var(--text-muted); margin:6px 2px 0;">
+        &#128161; Cada <strong>data</strong> é uma aula separada. Marque a presença, salve, e a aula aparece na lista lá embaixo.
+        Para lançar outra aula, troque a data (ou use “+ Nova aula”).
+      </p>
     </div>
 
     <div class="panel">
       <h3>${curso ? U.esc(curso.nome) + " — " + U.esc(turmaSel.nome) : "Alunos"}</h3>
-      <p class="panel-sub">${U.fmtData(chamadaAtual.data)}${turmaSel && turmaSel.horario ? " · " + U.esc(turmaSel.horario) : ""}</p>
+      <p class="panel-sub">
+        ${aulaJaExiste ? "&#9998; Editando a aula de" : "&#10133; Nova aula em"} <strong>${U.fmtData(chamadaAtual.data)}</strong>${turmaSel && turmaSel.horario ? " · " + U.esc(turmaSel.horario) : ""}
+      </p>
       <div id="ch-lista">${listaAlunos}</div>
       <div class="form-actions">
         <button class="btn ghost" data-action="addAlunosTurma">+ Adicionar alunos à turma</button>
-        <button class="btn accent" data-action="salvarChamada">Salvar chamada</button>
+        <button class="btn accent" data-action="salvarChamada">${aulaJaExiste ? "Atualizar aula" : "Salvar aula"}</button>
       </div>
     </div>
 
     <div class="panel">
-      <h3>Chamadas anteriores desta turma</h3>
-      <p class="panel-sub">Clique em Editar para corrigir uma chamada já feita</p>
+      <h3>Aulas registradas desta turma${totalAulas ? ` (${totalAulas})` : ""}</h3>
+      <p class="panel-sub">Cada linha é uma aula (uma data). Clique em <strong>Editar</strong> para abrir e corrigir a presença daquele dia.</p>
       ${historicoHTML}
     </div>`
     : `<div class="panel"><div class="empty-note">Nenhuma turma cadastrada.<br>Crie uma turma primeiro, na aba <strong>Turmas</strong>.</div></div>`}
@@ -278,6 +292,15 @@ Actions.abrirChamadaData = data => {
   chamadaAtual.data = data;
   chamadaAtual.presencas = {};
   App.render();
+};
+
+Actions.novaAula = () => {
+  chamadaAtual.data = U.hojeISO();
+  chamadaAtual.presencas = {};
+  chamadaAtual.conteudo = "";
+  App.render();
+  const inp = document.getElementById("ch-data");
+  if (inp) inp.focus();
 };
 
 Actions.excluirChamada = id => {
