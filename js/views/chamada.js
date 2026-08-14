@@ -197,8 +197,10 @@ Actions.salvarChamada = () => {
 
 /* adicionar alunos à turma direto da tela de chamada (preenchimento manual):
    marca alunos já cadastrados e/ou digita nomes novos, um por linha */
-Actions.addAlunosTurma = () => {
-  const turma = Store.get("turmas", chamadaAtual.turmaId);
+let addAlunosCtx = "";
+Actions.addAlunosTurma = turmaId => {
+  addAlunosCtx = turmaId || chamadaAtual.turmaId;
+  const turma = Store.get("turmas", addAlunosCtx);
   if (!turma) { U.toast("Escolha uma turma primeiro."); return; }
   const curso = Store.get("cursos", turma.cursoId);
   const jaNaTurma = new Set(Store.matriculasDaTurma(turma.id).map(m => m.alunoId));
@@ -235,7 +237,7 @@ Actions.addAlunosTurma = () => {
 };
 
 Actions.confirmarAddAlunos = () => {
-  const turma = Store.get("turmas", chamadaAtual.turmaId);
+  const turma = Store.get("turmas", addAlunosCtx || chamadaAtual.turmaId);
   if (!turma) return;
   const jaNaTurma = new Set(Store.matriculasDaTurma(turma.id).map(m => m.alunoId));
   let add = 0;

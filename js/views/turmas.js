@@ -26,6 +26,7 @@ Views.turmas = () => {
         <td>${media !== null ? media + "%" : "—"}</td>
         <td>${pillTurma(t.status)}</td>
         <td style="white-space:nowrap">
+          <button class="btn sm ghost" data-action="addAlunosTurma" data-id="${t.id}">+ Alunos</button>
           <button class="btn sm ghost" data-action="irChamada" data-id="${t.id}">Chamada</button>
           <button class="icon-btn" data-action="editarTurma" data-id="${t.id}" title="Editar" aria-label="Editar turma">&#9998;</button>
           <button class="icon-btn" data-action="excluirTurma" data-id="${t.id}" title="Excluir" aria-label="Excluir turma">&#128465;</button>
