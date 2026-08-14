@@ -108,6 +108,7 @@ Views.chamada = turmaIdParam => {
       <p class="panel-sub">${U.fmtData(chamadaAtual.data)}${turmaSel && turmaSel.horario ? " · " + U.esc(turmaSel.horario) : ""}</p>
       <div id="ch-lista">${listaAlunos}</div>
       <div class="form-actions">
+        <button class="btn ghost" data-action="addAlunosTurma">+ Adicionar alunos à turma</button>
         <button class="btn accent" data-action="salvarChamada">Salvar chamada</button>
       </div>
     </div>
@@ -138,7 +139,14 @@ Views.aposRender = (rota, param) => {
     App.render();
   });
   inpData.addEventListener("change", () => {
-    chamadaAtual.data = inpData.value;
+    const v = inpData.value;
+    // ignora estados intermediários enquanto o ano ainda está sendo digitado
+    // (o campo dispara "change" com anos como 0002, o que reabria a tela e travava)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { chamadaAtual.data = v; return; }
+    const ano = parseInt(v.slice(0, 4), 10);
+    if (ano < 2000 || ano > 2100) { chamadaAtual.data = v; return; }
+    if (v === chamadaAtual.data) return;
+    chamadaAtual.data = v;
     chamadaAtual.presencas = {};
     App.render();
   });
@@ -185,6 +193,83 @@ Actions.salvarChamada = () => {
   chamadaAtual.presencas = {};
   U.toast(existente ? "Chamada atualizada." : "Chamada salva.");
   App.render();
+};
+
+/* adicionar alunos à turma direto da tela de chamada (preenchimento manual):
+   marca alunos já cadastrados e/ou digita nomes novos, um por linha */
+Actions.addAlunosTurma = () => {
+  const turma = Store.get("turmas", chamadaAtual.turmaId);
+  if (!turma) { U.toast("Escolha uma turma primeiro."); return; }
+  const curso = Store.get("cursos", turma.cursoId);
+  const jaNaTurma = new Set(Store.matriculasDaTurma(turma.id).map(m => m.alunoId));
+  const disponiveis = U.ordenarPorNome(Store.col("alunos")).filter(a => !jaNaTurma.has(a.id));
+  const listaCheck = disponiveis.length ? disponiveis.map(a => `
+    <label style="display:flex; align-items:center; gap:8px; padding:4px 0; font-size:0.9rem;">
+      <input type="checkbox" class="add-al" value="${a.id}"> ${U.esc(a.nome)}
+    </label>`).join("") : `<p style="font-size:0.85rem; color:var(--text-muted);">Todos os alunos cadastrados já estão nesta turma.</p>`;
+
+  App.abrirModal(`Adicionar alunos — ${U.esc((curso ? curso.nome + " · " : "") + turma.nome)}`, `
+    <p style="font-size:0.9rem; margin-bottom:10px;">Marque quem já está cadastrado e/ou escreva nomes novos (um por linha).</p>
+    ${disponiveis.length ? `
+    <div class="field">
+      <label>Alunos já cadastrados</label>
+      <input type="search" id="add-busca" placeholder="Filtrar por nome…" style="margin-bottom:6px;">
+      <div id="add-lista" style="max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px;">${listaCheck}</div>
+    </div>` : listaCheck}
+    <div class="field">
+      <label for="add-novos">Nomes novos (um por linha)</label>
+      <textarea id="add-novos" rows="4" placeholder="Maria da Silva&#10;João Pereira"></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
+      <button type="button" class="btn accent" data-modal-action="confirmarAddAlunos">Adicionar à turma</button>
+    </div>`);
+
+  const busca = document.getElementById("add-busca");
+  if (busca) busca.addEventListener("input", () => {
+    const f = busca.value.trim().toLowerCase();
+    document.querySelectorAll("#add-lista label").forEach(l => {
+      l.style.display = l.textContent.toLowerCase().includes(f) ? "" : "none";
+    });
+  });
+};
+
+Actions.confirmarAddAlunos = () => {
+  const turma = Store.get("turmas", chamadaAtual.turmaId);
+  if (!turma) return;
+  const jaNaTurma = new Set(Store.matriculasDaTurma(turma.id).map(m => m.alunoId));
+  let add = 0;
+  // marcados
+  document.querySelectorAll(".add-al:checked").forEach(ch => {
+    if (!jaNaTurma.has(ch.value)) {
+      Store.upsert("matriculas", { alunoId: ch.value, turmaId: turma.id, status: "cursando", data: U.hojeISO(), bolsa: false });
+      jaNaTurma.add(ch.value);
+      add++;
+    }
+  });
+  // nomes novos
+  const nomes = (document.getElementById("add-novos").value || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const idx = new Map();
+  for (const a of Store.col("alunos")) idx.set((a.nome || "").trim().toLowerCase(), a);
+  for (const nome of nomes) {
+    let aluno = idx.get(nome.toLowerCase());
+    if (!aluno) {
+      aluno = Store.upsert("alunos", {
+        nome, nascimento: "", cpf: "", telefone: "", email: "", endereco: "", bairro: "", cidade: "", cep: "",
+        responsavel: "", encaminhamento: "", atingidoEnchente: "", impactoEnchentes: "", rendaFamiliar: "",
+        beneficios: "", moradiaAtual: "", necessidades: "", observacoes: "", termos: []
+      });
+      idx.set(nome.toLowerCase(), aluno);
+    }
+    if (!jaNaTurma.has(aluno.id)) {
+      Store.upsert("matriculas", { alunoId: aluno.id, turmaId: turma.id, status: "cursando", data: U.hojeISO(), bolsa: false });
+      jaNaTurma.add(aluno.id);
+      add++;
+    }
+  }
+  App.fecharModal();
+  App.render();
+  U.toast(add ? `${add} ${U.plural(add, "aluno adicionado", "alunos adicionados")} à turma.` : "Nenhum aluno novo para adicionar.");
 };
 
 Actions.abrirChamadaData = data => {

@@ -68,17 +68,15 @@ function abrirFormTurma(t) {
   const statusOpts = STATUS_TURMA.map(s =>
     `<option value="${s}" ${t.status === s ? "selected" : ""}>${s}</option>`).join("");
 
-  if (!Store.col("cursos").length) {
-    U.toast("Cadastre um curso antes de criar turmas.");
-    return;
-  }
-
   App.abrirModal(t.id ? "Editar turma" : "Nova turma", `
     <form>
       <div class="form-grid">
         <div class="field">
           <label for="ft-curso">Curso *</label>
-          <select id="ft-curso" name="cursoId" required>${cursosOpts}</select>
+          <div style="display:flex; gap:6px;">
+            <select id="ft-curso" name="cursoId" required style="flex:1;">${cursosOpts || '<option value="">— nenhum curso ainda —</option>'}</select>
+            <button type="button" class="btn ghost sm" data-modal-action="novoCursoRapido" title="Criar novo curso">+</button>
+          </div>
         </div>
         <div class="field">
           <label for="ft-nome">Nome da turma *</label>
@@ -128,6 +126,26 @@ function abrirFormTurma(t) {
     App.render();
   });
 }
+
+/* cria um curso na hora, sem sair do formulário de turma */
+Actions.novoCursoRapido = () => {
+  const nome = prompt("Nome do novo curso:");
+  if (!nome || !nome.trim()) return;
+  const c = Store.upsert("cursos", {
+    nome: nome.trim(), ementa: "", corIndex: (Store.col("cursos").length % 8) + 1, status: "ativo",
+    modulos: [], modalidade: "curso", tipoCurso: "gratuito", valor: 0, cobranca: ""
+  });
+  const sel = document.getElementById("ft-curso");
+  if (sel) {
+    const opt = document.createElement("option");
+    opt.value = c.id; opt.textContent = c.nome; opt.selected = true;
+    // remove o placeholder "— nenhum curso ainda —", se existir
+    const ph = [...sel.options].find(o => o.value === "");
+    if (ph) ph.remove();
+    sel.appendChild(opt);
+  }
+  U.toast("Curso criado.");
+};
 
 Actions.novaTurma = () => abrirFormTurma({ cursoId: "", professorId: "", nome: "", dataInicio: "", dataFim: "", horario: "", local: "", vagas: "", status: "planejada" });
 Actions.editarTurma = id => abrirFormTurma(Store.get("turmas", id));
