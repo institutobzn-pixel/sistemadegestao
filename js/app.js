@@ -127,18 +127,43 @@ const App = (() => {
     window.scrollTo(0, 0);
   }
 
-  /* ---------- portão de entrada (perfis: admin, secretaria, usuário) ---------- */
+  /* ---------- portão de entrada (perfis: admin, presidência, secretaria) ---------- */
+  let portaoTentouBaixar = false;
   function renderPortao() {
     document.querySelectorAll("#nav-tabs a").forEach(a => a.classList.remove("active"));
     const view = document.getElementById("view");
     const primeiraVez = !Store.temSenha("admin");
+    const nuvemCfg = (typeof Nuvem !== "undefined") && Nuvem.configurada();
+
+    /* Se o aparelho está ligado à nuvem mas ainda sem dados, NÃO peça "criar
+       senha" — mostre que está baixando. Evita criar senha duplicada por engano
+       e a confusão de "a área sumiu". A tela de login aparece após o download. */
+    if (primeiraVez && nuvemCfg && !portaoTentouBaixar) {
+      portaoTentouBaixar = true;
+      view.innerHTML = `
+        <div class="panel" style="max-width:440px; margin:40px auto 0;">
+          <h3 style="margin-bottom:2px;">Trazendo os dados do instituto…</h3>
+          <p class="panel-sub">Este aparelho está conectado à nuvem e está baixando os cadastros e as senhas. A tela de login aparece sozinha em instantes.</p>
+          <div class="form-actions"><button class="btn accent" id="portao-baixar">Baixar agora</button></div>
+        </div>`;
+      const baixar = async () => { try { await Nuvem.verificar(); } catch (e) {} render(); };
+      const b = document.getElementById("portao-baixar");
+      if (b) b.addEventListener("click", baixar);
+      baixar();
+      window.scrollTo(0, 0);
+      return;
+    }
 
     view.innerHTML = `
       <div class="panel" style="max-width:440px; margin:40px auto 0;">
-        <h3 style="margin-bottom:2px;">${primeiraVez ? "Bem-vindo! Crie a senha do administrador" : "Acesso restrito"}</h3>
+        <h3 style="margin-bottom:2px;">${primeiraVez ? "Primeiro acesso neste aparelho" : "Acesso restrito"}</h3>
         <p class="panel-sub">${primeiraVez
-          ? "Esta é a senha principal do sistema. Só o administrador cria e troca as demais senhas."
+          ? "Se o instituto <strong>já usa</strong> o sistema, clique em <strong>“☁️ Trazer os dados”</strong> abaixo — <strong>não crie senha nova</strong>. Crie a senha só se for a primeiríssima vez do instituto."
           : "Escolha seu perfil e digite a senha."}</p>
+        ${primeiraVez ? `<div class="form-actions" style="margin-bottom:6px;">
+          <a href="#" id="portao-nuvem-top" class="btn accent" style="width:100%; justify-content:center; text-decoration:none;">&#9729;&#65039; Trazer os dados do instituto (nuvem)</a>
+        </div>
+        <details style="margin-bottom:6px;"><summary style="cursor:pointer; font-size:0.85rem; color:var(--text-muted);">É a primeiríssima vez do instituto? Criar o sistema do zero</summary>` : ""}
         <div class="form-grid" style="grid-template-columns:1fr;">
           ${primeiraVez ? "" : `
           <div class="field">
@@ -170,6 +195,7 @@ const App = (() => {
         <div class="form-actions">
           <button class="btn accent" id="portao-entrar">${primeiraVez ? "Criar senha e entrar" : "Entrar"}</button>
         </div>
+        ${primeiraVez ? "</details>" : ""}
         <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border); font-size:0.82rem; display:flex; flex-direction:column; gap:6px;">
           <a href="#/professor">&#128274; Sou professor — entrar com meu PIN</a>
           <a href="#/atendimentos/minha-area">&#128274; Sou profissional de saúde — entrar com meu PIN</a>
@@ -221,9 +247,8 @@ const App = (() => {
       i.addEventListener("keydown", ev => { if (ev.key === "Enter") entrar(); }));
 
     /* trazer os dados da nuvem num computador novo (antes de logar) */
-    const linkNuvem = document.getElementById("portao-nuvem");
-    if (linkNuvem) linkNuvem.addEventListener("click", ev => {
-      ev.preventDefault();
+    const abrirNuvemPortao = ev => {
+      if (ev) ev.preventDefault();
       const urlAtual = (typeof Nuvem !== "undefined" && Nuvem.configurada()) ? Nuvem.endereco() : "";
       abrirModal("Trazer os dados da nuvem", `
         <p style="font-size:0.9rem; margin-bottom:12px;">
@@ -257,7 +282,11 @@ const App = (() => {
         aviso("Dados baixados! Agora entre com sua senha.");
         render();
       });
-    });
+    };
+    const linkNuvem = document.getElementById("portao-nuvem");
+    if (linkNuvem) linkNuvem.addEventListener("click", abrirNuvemPortao);
+    const linkNuvemTop = document.getElementById("portao-nuvem-top");
+    if (linkNuvemTop) linkNuvemTop.addEventListener("click", abrirNuvemPortao);
 
     /* recuperação: redefine só a senha do admin, mantendo todos os dados.
        Só funciona neste computador (quem tem acesso físico já controla tudo). */
@@ -284,7 +313,9 @@ const App = (() => {
       render();
     });
 
-    senha.focus();
+    // não focar a senha quando ela está dentro do "criar sistema" recolhido
+    // (evita abrir sozinho o formulário de criar senha num aparelho novo)
+    if (senha && !primeiraVez) senha.focus();
     window.scrollTo(0, 0);
   }
 
