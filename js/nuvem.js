@@ -92,23 +92,20 @@ const Nuvem = (() => {
     enviando = true;
     try {
       const local = Store.snapshot();
-      // PROTEÇÃO ANTI-PERDA: nunca sobrescrever a nuvem cheia com um estado vazio.
-      // Se este aparelho está sem dados (ex.: navegador novo ainda não sincronizado),
-      // em vez de apagar a nuvem, traz os dados dela para cá.
-      if (!temConteudo(local)) {
-        const linha = await baixar();
-        if (linha && temConteudo(linha.dados)) {
-          ultimoRemoto = linha.atualizado_em || ultimoRemoto;
-          if (hash(JSON.stringify(linha.dados)) !== hash(Store.exportarJSON())) {
-            Store.aplicarRemoto(linha.dados);
-            if (typeof App !== "undefined" && App.render) App.render();
-            if (typeof U !== "undefined" && U.toast) U.toast("Dados recuperados da nuvem.");
-          }
-          marcarStatus("ok");
-          return; // não envia o vazio
+      // PROTEÇÃO ANTI-PERDA: antes de enviar, busca a nuvem e mescla protegido —
+      // nenhuma coleção cheia na nuvem é apagada por uma cópia local desatualizada.
+      let paraEnviar = local;
+      const linha = await baixar();
+      if (linha && linha.dados) {
+        paraEnviar = mesclarProtegido(local, linha.dados); // local vence, mas não zera coleções da nuvem
+        if (hash(JSON.stringify(paraEnviar)) !== hash(Store.exportarJSON())) {
+          // alguma coleção foi recuperada da nuvem → reflete aqui também
+          Store.aplicarRemoto(paraEnviar);
+          if (typeof App !== "undefined" && App.render) App.render();
+          if (typeof U !== "undefined" && U.toast) U.toast("Dados recuperados da nuvem.");
         }
       }
-      await enviarEstado(local, quem());
+      await enviarEstado(paraEnviar, quem());
       marcarStatus("ok");
     } catch (e) {
       marcarStatus("erro", e.message);
@@ -121,12 +118,28 @@ const Nuvem = (() => {
     try { return (App && App.nivel && App.nivel()) || "app"; } catch (e) { return "app"; }
   }
 
+  const COLS = ["cursos", "professores", "equipe", "turmas", "alunos", "matriculas",
+    "chamadas", "pacientes", "profsaude", "atendimentos", "eventos", "lancamentos",
+    "assistidos", "listaEspera", "compromissosAS", "legislacaoAS", "profsociais",
+    "documentos", "linksImagens"];
+
   function temConteudo(d) {
     if (!d) return false;
-    const cols = ["alunos", "pacientes", "assistidos", "professores", "turmas",
-      "matriculas", "chamadas", "atendimentos", "lancamentos", "eventos",
-      "documentos", "listaEspera", "profsociais", "profsaude"];
-    return cols.some(c => Array.isArray(d[c]) && d[c].length > 0);
+    return COLS.some(c => Array.isArray(d[c]) && d[c].length > 0);
+  }
+
+  /* Mescla protegida: devolve `preferido`, MAS para cada coleção que ficou vazia
+     em `preferido` e está cheia em `base`, mantém a de `base`. Assim uma cópia
+     desatualizada (sem uma coleção inteira) nunca apaga essa coleção da outra.
+     Deleções de registros individuais dentro de uma coleção cheia continuam valendo. */
+  function mesclarProtegido(preferido, base) {
+    const out = Object.assign({}, base, preferido);
+    for (const c of COLS) {
+      const pref = Array.isArray(preferido && preferido[c]) ? preferido[c] : [];
+      const bas = Array.isArray(base && base[c]) ? base[c] : [];
+      out[c] = (pref.length === 0 && bas.length > 0) ? bas : pref;
+    }
+    return out;
   }
 
   async function verificar() {
@@ -136,10 +149,11 @@ const Nuvem = (() => {
       if (!linha) return;
       if (linha.atualizado_em && linha.atualizado_em === ultimoRemoto) return; // nada novo
       ultimoRemoto = linha.atualizado_em || ultimoRemoto;
-      const remotoStr = JSON.stringify(linha.dados || {});
+      // mescla protegida: a nuvem manda, mas não apaga uma coleção que só existe aqui
+      const combinado = mesclarProtegido(linha.dados || {}, Store.snapshot());
       const localStr = Store.exportarJSON();
-      if (hash(remotoStr) !== hash(localStr) && temConteudo(linha.dados)) {
-        Store.aplicarRemoto(linha.dados);
+      if (hash(JSON.stringify(combinado)) !== hash(localStr) && temConteudo(combinado)) {
+        Store.aplicarRemoto(combinado);
         if (typeof App !== "undefined" && App.render) App.render();
         if (typeof U !== "undefined" && U.toast) U.toast("Dados atualizados da nuvem.");
       }
@@ -178,10 +192,15 @@ const Nuvem = (() => {
       const linha = await baixar();
       if (linha && temConteudo(linha.dados)) {
         ultimoRemoto = linha.atualizado_em || "";
-        const remotoStr = JSON.stringify(linha.dados);
-        if (hash(remotoStr) !== hash(Store.exportarJSON())) {
-          Store.aplicarRemoto(linha.dados);
+        // mescla protegida: junta o que a nuvem tem com o que só existe aqui
+        const combinado = mesclarProtegido(linha.dados, Store.snapshot());
+        if (hash(JSON.stringify(combinado)) !== hash(Store.exportarJSON())) {
+          Store.aplicarRemoto(combinado);
           if (typeof App !== "undefined" && App.render) App.render();
+        }
+        // se a fusão recuperou coleções que faltavam na nuvem, devolve para a nuvem
+        if (hash(JSON.stringify(combinado)) !== hash(JSON.stringify(linha.dados))) {
+          agendarEnvio();
         }
       } else if (temConteudo(Store.snapshot())) {
         await enviarEstado(Store.snapshot(), quem()); // semeia a nuvem
