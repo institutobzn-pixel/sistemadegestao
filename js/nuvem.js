@@ -91,7 +91,24 @@ const Nuvem = (() => {
     if (!configurada() || enviando) return;
     enviando = true;
     try {
-      await enviarEstado(Store.snapshot(), quem());
+      const local = Store.snapshot();
+      // PROTEÇÃO ANTI-PERDA: nunca sobrescrever a nuvem cheia com um estado vazio.
+      // Se este aparelho está sem dados (ex.: navegador novo ainda não sincronizado),
+      // em vez de apagar a nuvem, traz os dados dela para cá.
+      if (!temConteudo(local)) {
+        const linha = await baixar();
+        if (linha && temConteudo(linha.dados)) {
+          ultimoRemoto = linha.atualizado_em || ultimoRemoto;
+          if (hash(JSON.stringify(linha.dados)) !== hash(Store.exportarJSON())) {
+            Store.aplicarRemoto(linha.dados);
+            if (typeof App !== "undefined" && App.render) App.render();
+            if (typeof U !== "undefined" && U.toast) U.toast("Dados recuperados da nuvem.");
+          }
+          marcarStatus("ok");
+          return; // não envia o vazio
+        }
+      }
+      await enviarEstado(local, quem());
       marcarStatus("ok");
     } catch (e) {
       marcarStatus("erro", e.message);
