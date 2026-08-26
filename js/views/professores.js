@@ -407,7 +407,11 @@ Views.professorArea = () => {
           <span class="ico">&#128274;</span>
           <div><p>O PIN é cadastrado pela secretaria no formulário do professor (aba Professores → editar).</p></div>
         </div>`
-        : `<div class="empty-note">Nenhum professor cadastrado ainda.</div>`}
+        : `<div class="empty-note" style="text-align:left;">
+            <p style="margin:0 0 8px;"><strong>Nenhum professor aparece neste aparelho.</strong></p>
+            <p style="margin:0 0 12px; font-size:0.9rem;">Se o instituto já usa o sistema, é porque <strong>este computador ainda não baixou os dados</strong> da nuvem. Traga-os uma vez (depois é só entrar com o PIN):</p>
+            <button class="btn accent" data-action="conectarNuvem">&#9729;&#65039; Trazer os dados do instituto</button>
+          </div>`}
       </div>
     `;
   }

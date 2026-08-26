@@ -655,7 +655,12 @@ function viewLoginProf() {
         <span class="ico">&#128274;</span>
         <div><p>O PIN é cadastrado pela secretaria no formulário do profissional (aba Profissionais). Esta área organiza o acesso no dia a dia, mas os dados continuam no navegador deste computador.</p></div>
       </div>`
-      : `<div class="empty-note">Nenhum profissional cadastrado ainda.<br>Cadastre a equipe na aba <strong>Profissionais</strong>.</div>`}
+      : `<div class="empty-note" style="text-align:left;">
+          <p style="margin:0 0 8px;"><strong>Nenhum profissional aparece neste aparelho.</strong></p>
+          <p style="margin:0 0 12px; font-size:0.9rem;">Se o instituto já usa o sistema, é porque <strong>este computador ainda não baixou os dados</strong> da nuvem. Traga-os uma vez (depois é só entrar com o PIN):</p>
+          <button class="btn accent" data-action="conectarNuvem">&#9729;&#65039; Trazer os dados do instituto</button>
+          <p style="margin:12px 0 0; font-size:0.82rem; color:var(--text-muted);">Se for a primeiríssima vez do instituto, cadastre a equipe na aba <strong>Profissionais</strong> (entrando como admin).</p>
+        </div>`}
     </div>
   `;
 }

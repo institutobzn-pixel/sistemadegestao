@@ -232,3 +232,42 @@ const Nuvem = (() => {
     statusAtual
   };
 })();
+
+/* Ação reutilizável: abre o formulário de conexão com a nuvem, baixa os dados
+   e recarrega. Usada por qualquer tela vazia ("este aparelho ainda não trouxe
+   os dados") — professor, profissional de saúde, etc. */
+Actions.conectarNuvem = () => {
+  const urlAtual = Nuvem.configurada() ? Nuvem.endereco() : "";
+  App.abrirModal("Trazer os dados do instituto", `
+    <p style="font-size:0.9rem; margin-bottom:12px;">
+      Este aparelho ainda não baixou os dados. Cole o endereço e a chave (o admin fornece,
+      ou use o link/QR de acesso). Depois é só entrar com o seu PIN.
+    </p>
+    <div class="field">
+      <label for="cn-url">Endereço (Project URL)</label>
+      <input id="cn-url" type="text" placeholder="https://xxxxxxxx.supabase.co" value="${urlAtual}">
+    </div>
+    <div class="field">
+      <label for="cn-key">Chave publicável (anon / public)</label>
+      <input id="cn-key" type="text" placeholder="sb_publishable_..." autocomplete="off">
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
+      <button type="button" class="btn accent" data-modal-action="conectarNuvemOk">Baixar dados</button>
+    </div>`);
+};
+
+Actions.conectarNuvemOk = async () => {
+  const u = (document.getElementById("cn-url").value || "").trim();
+  const k = (document.getElementById("cn-key").value || "").trim();
+  if (!/^https:\/\/.+\.supabase\.co/i.test(u)) { alert("O endereço deve ser parecido com https://xxxxxxxx.supabase.co"); return; }
+  if (!k) { alert("Cole a chave publicável (anon / public)."); return; }
+  Nuvem.salvarConfig(u, k);
+  U.toast("Conectando…");
+  const r = await Nuvem.testar();
+  if (!r.ok) { alert("Não foi possível conectar.\n\n" + r.msg); return; }
+  await Nuvem.iniciar();
+  App.fecharModal();
+  U.toast("Dados baixados! Agora entre com seu PIN.");
+  App.render();
+};
