@@ -1,131 +1,202 @@
-# Painel de Cursos — Instituto Brasa Zona Norte
+# Painel do Instituto Brasa Zona Norte
 
-Sistema administrativo para gestão dos cursos do instituto: cadastro de cursos
-(ementa, módulos, carga horária), turmas, professores, alunos, lista de chamada,
-relatórios de presença e cruzamento de cursos por aluno.
+Sistema de gestão do instituto: cursos, turmas, alunos, chamada, atendimentos
+clínicos, serviço social, agenda, documentação, financeiro e indicadores.
 
-**Versão 1** — aplicativo 100% no navegador, sem servidor. Os dados ficam salvos
-no próprio navegador (localStorage) de quem usa.
+> **Para quem vai continuar o desenvolvimento (humano ou IA): leia este arquivo
+> inteiro antes de mexer. Ele resume a arquitetura, as decisões e as armadilhas.**
 
-## Funcionalidades
+---
 
-- **Painel**: alunos únicos, matrículas ativas, presença média, alunos por curso,
-  situação das matrículas, trajetória entre cursos e alertas de baixa frequência.
-- **Cursos**: os 5 cursos iniciais já vêm cadastrados (Empreendedorismo Resiliente,
-  Gestão Financeira para Empreendedores, Social Media, Educação Financeira,
-  Maquiagem Profissional) e é possível criar novos, com ementa, módulos e carga horária.
-- **Turmas**: edições de cada curso, com professor, período, horário, local, vagas e status.
-- **Agenda**: calendário geral do instituto — datas de cursos, workshops, palestras,
-  eventos e reuniões, cada um com sala/local (Salas 1 a 5, Auditório, Hall Superior e
-  Hall de Entrada, com possibilidade de adicionar novas). Seletor de ano a partir de
-  2025 — os próximos anos aparecem automaticamente. Aviso de conflito quando a mesma
-  sala é reservada duas vezes no mesmo horário, resumo do uso das salas no ano e
-  exportação da agenda em planilha.
-- Cada curso tem uma **modalidade**: Curso, Workshop ou Palestra.
-- **Alunos**: cadastro geral em ordem alfabética com busca — nome completo, nascimento,
-  CPF, telefone, e-mail, endereço completo, responsável, encaminhamento, impacto das
-  enchentes e situação social. A ficha de cada aluno mostra a trajetória: **quais cursos
-  diferentes ele já fez no instituto**.
-- **Professores**: nome, contato, formação e experiência profissional.
-- **Chamada**: presença/falta por turma e data, com histórico editável e frequência
-  individual calculada automaticamente.
-- **Gráficos**: relatórios visuais (pizzas/roscas, barras e linha do tempo) em três
-  seções — **Visão geral do instituto** (todas as áreas: pessoas por área, impacto
-  das enchentes geral somando alunos + pacientes, encaminhamentos gerais),
-  **Gratuidade** (pessoas atendidas sem custo, bolsistas, alunos e pacientes por
-  condição, atendimentos gratuitos por especialidade) e **Cursos** (alunos por curso,
-  situação das matrículas, presença por turma, evolução da frequência).
-- **Relatórios**: presença por turma (com alerta abaixo de 75%), alunos multi-curso,
-  combinações de cursos mais comuns, exportação em CSV (Excel) e impressão/PDF.
-- **Atendimentos (módulo clínico)**: agenda de Psicologia, Psiquiatria e
-  Neuropsicopedagogia com sub-áreas:
-  - *Agenda*: atendimentos com data/hora, paciente, profissional, especialidade,
-    tipo (primeira/retorno), formato (individual/grupo), modalidade
-    (presencial/online) e status (agendado, confirmado, realizado, faltou, cancelado);
-  - *Pacientes*: cadastro único com dados pessoais, sociais e **financeiros**
-    (gratuito ou pago, cobrança mensal ou por consulta, valor);
-  - *Profissionais*: especialidade, CRP/CRM/registro, dias e horários de atendimento;
-  - *Relatórios*: gráficos por especialidade/status/profissional/modalidade,
-    receita prevista no mês, pacientes pagantes, cruzamento de especialidades
-    por paciente e exportação CSV.
-  Novas especialidades podem ser adicionadas a qualquer momento (botão "+").
-- **Minha área (área restrita do profissional)**: cada profissional entra com um
-  PIN (definido pela secretaria no cadastro dele) e vê somente os próprios
-  pacientes, agenda, valores e estatísticas — sem dados clínicos, que o sistema
-  não armazena. *Atenção: é uma restrição organizacional; como os dados ficam no
-  navegador, a proteção forte com login real virá na versão 2 (com servidor).*
-  Nos dados de exemplo, o PIN dos três profissionais é `1234`.
-- **Área do professor (cursos)**: mesmo esquema de PIN para os professores dos
-  cursos (botão "Área do professor" na aba Professores): cada um vê apenas as
-  próprias turmas, alunos (contato e frequência, sem dados sociais), alunos em
-  risco e atalho para fazer a chamada. PIN de exemplo: `1234`.
-- **Cursos gratuitos ou pagos, com bolsas**: cada curso pode ser marcado como
-  gratuito ou pago (valor único ou mensal). Em cursos pagos, a matrícula tem a
-  opção **bolsista** (isento). Os gráficos de gratuidade consideram alunos
-  gratuitos + bolsistas + pacientes gratuitos.
-- O cadastro de pacientes também pergunta **"Atingido pelas enchentes?"**, igual
-  ao de alunos — os dois alimentam o gráfico geral de impacto das enchentes.
+## 1. O que é, tecnicamente
 
-O campo **Encaminhamento** dos alunos já vem com as origens *Demanda espontânea, CRAS
-e Escolas*, e é possível **adicionar novas origens** a qualquer momento (botão "+" ao
-lado do campo). Há também o campo *Atingido pelas enchentes?* para o gráfico social.
-- **Backup**: exportação e importação de todos os dados em arquivo `.json`.
+- **Aplicação 100% client-side**: HTML + CSS + JavaScript puro (sem framework,
+  sem build, sem npm). Basta servir a pasta como site estático.
+- **Hospedagem atual**: GitHub Pages (publica sozinho a cada `git push` na `main`).
+- **Persistência local**: `localStorage`, chave `bzn-painel-v1`.
+- **Sincronização entre aparelhos**: Supabase (opcional, configurado pelo usuário).
+- **PWA**: instalável, funciona offline (`manifest.webmanifest` + `sw.js`).
 
-**Níveis de acesso**: no primeiro uso o sistema pede a **senha do administrador**.
-O admin cria as senhas dos perfis **Secretaria** (operação completa, sem gerenciar
-logins) e **Usuário** (visualização de Painel, Agenda e Gráficos) em Indicadores →
-Relatórios → Segurança, e define os PINs de professores e profissionais nos
-respectivos cadastros. Chamada e Atendimentos são exclusivos de admin/secretaria;
-professores e profissionais acessam apenas o que é deles, com PIN próprio, pelos
-atalhos da tela de entrada. *Proteção organizacional: os dados seguem no navegador.*
-
-Outros recursos: modalidades Curso/Workshop/Palestra/**Imersão**; cadastro completo
-de professores (nascimento, CPF/CNPJ, endereço, PIX, início no instituto e anexos);
-área de **Funcionários e colaboradores** (aba Professores); aviso de
-**aniversariantes do mês** no Painel (todas as áreas); agenda com seletor de
-**ano e mês**; gráficos de condição apenas Gratuitos × Pagos (bolsistas contam
-como pagos).
-
-- **Financeiro** (admin e gestor financeiro, com PIN próprio definido pelo admin):
-  importação do extrato **SICOOB** (OFX/CSV) e das vendas/assinaturas da **Guru**
-  (CSV), com prévia antes de gravar e proteção contra duplicados; lançamentos
-  manuais, categorias configuráveis, entradas × saídas por mês, despesas por
-  categoria e exportação em planilha por período.
-
-Na primeira visita, o botão **“Carregar dados de exemplo”** no Painel preenche o
-sistema com dados fictícios para conhecer as telas. Para começar de verdade, use
-**Relatórios → Apagar todos os dados**.
-
-## Como usar localmente
-
-Basta abrir o `index.html` em um navegador — não precisa instalar nada.
-
-## Como publicar no Cloudflare Pages (grátis)
-
-1. Crie uma conta gratuita em [dash.cloudflare.com](https://dash.cloudflare.com).
-2. No menu, vá em **Workers & Pages → Create → Pages → Connect to Git**.
-3. Autorize o GitHub e escolha este repositório (`app-instituto`).
-4. Em *Build settings*, deixe tudo em branco (não há build) e clique em **Save and Deploy**.
-5. Em ~1 minuto o painel estará no ar em uma URL do tipo `https://app-instituto.pages.dev`.
-
-A cada novo commit neste repositório, o Cloudflare republica automaticamente.
-
-## Avisos importantes
-
-- **Dados por navegador**: nesta versão, cada computador/celular tem seus próprios
-  dados. Para uso em equipe com dados compartilhados e login, a versão 2 usará um
-  banco de dados (Cloudflare D1) — a estrutura do código já foi pensada para essa migração.
-- **LGPD**: o sistema guarda dados pessoais sensíveis (CPF, endereço, situação social).
-  Exporte backups com frequência, guarde-os em local seguro e restrinja o acesso ao
-  computador onde o sistema é usado.
-
-## Estrutura do código
+### Estrutura de arquivos
 
 ```
-index.html          — página única do aplicativo
-css/style.css       — design system (tema claro/escuro, cores por curso)
-js/util.js          — utilitários
-js/store.js         — camada de dados (localStorage) e regras de negócio
-js/app.js           — roteador e modal
-js/views/*.js       — uma tela por arquivo
+index.html            # casca: topo, nav, modal, <script> de tudo (ordem importa)
+sw.js                 # service worker (cache offline; lista ESSENCIAIS + versão do cache)
+manifest.webmanifest  # PWA
+css/style.css         # design system inteiro (tokens, componentes, tema claro/escuro, print)
+js/util.js            # U (helpers) e o objeto global Actions {}
+js/store.js           # Store: TODO o estado e as regras de negócio
+js/nuvem.js           # Nuvem: sincronização com o Supabase + Actions.conectarNuvem
+js/anexos.js          # Anexos: upload de arquivos (dataURL) reutilizável
+js/csv.js             # CSV: parser + datas + presença + normalização de nome
+js/charts.js          # gráficos em SVG puro (sem biblioteca)
+js/views/*.js         # uma view por área; registram Views.x e Actions.x
+js/app.js             # roteador (hash), portão de login, modal, render()
 ```
+
+**Convenções**
+- Roteamento por hash: `#/rota/param` → `App.render()` chama `Views[rota](param)`.
+- Toda view devolve **string HTML**. Interatividade via `data-action="nome"`
+  (dispara `Actions.nome(id, el)`) e, dentro de modais, `data-modal-action="nome"`.
+- `App.abrirModal(titulo, html, aoEnviar)`; se houver `<form>` e `aoEnviar`, o
+  submit entrega os campos como objeto.
+- Sempre escapar texto do usuário com `U.esc(...)`.
+
+---
+
+## 2. Modelo de dados (`js/store.js`)
+
+Um único objeto `db` guardado em `localStorage`. Coleções (arrays de `{id, ...}`):
+
+`cursos, turmas, matriculas, alunos, chamadas, professores, equipe,
+pacientes, profsaude, atendimentos, assistidos, listaEspera, compromissosAS,
+legislacaoAS, profsociais, eventos, lancamentos, documentos, linksImagens`
+
+mais `config` (senhas/PINs em hash, listas de opções, pergunta de segurança).
+
+API principal: `Store.col(nome)`, `get`, `upsert`, `remover`, `salvar`,
+`snapshot()`, `aplicarRemoto(dados)`, `exportarJSON()`, `importarJSON(txt)`,
+`limparTudo()` + dezenas de consultas de negócio (presença, cruzamentos, resumos).
+
+`remover()` faz integridade referencial simples (ex.: apagar turma remove
+matrículas e chamadas dela).
+
+### Acessos
+
+| Perfil | Como entra | Alcance |
+|---|---|---|
+| Admin | perfil "Administração" + senha | tudo |
+| Presidência | perfil "Presidência" + senha | tudo (igual admin) |
+| Secretaria | perfil "Secretaria" + senha | operação, sem logins/financeiro |
+| Gestor financeiro | PIN | só Financeiro |
+| Serviço social | PIN | só Serviço Social |
+| Professor | PIN individual (no cadastro dele) | só as turmas dele |
+| Profissional de saúde | PIN individual | só os pacientes/agenda dele |
+| Colaborador | **não acessa** | apenas cadastro interno |
+
+`App.ehAdmin()` = admin **ou** presidente. Use-o em toda checagem de permissão.
+Senhas/PINs são hash (`U.hashPin`) guardados em `config` — logo, **sincronizam
+junto com os dados**.
+
+---
+
+## 3. Sincronização com a nuvem (`js/nuvem.js`) — leia com atenção
+
+### Como funciona
+O **banco inteiro** é gravado como **uma linha** (`id=1`) na tabela `painel` do
+Supabase, coluna `dados` (jsonb). Cada aparelho:
+- **envia** (debounce ~1,2 s) sempre que `Store.salvar()` roda;
+- **verifica** a nuvem a cada 7 s e aplica o que mudou.
+
+Configuração fica em `localStorage`: `bzn-nuvem-url` e `bzn-nuvem-key`.
+Sem configuração, o app funciona 100% local (comportamento padrão).
+
+### Proteção anti-perda (NÃO REMOVER)
+Como é um "blob" com last-write-wins, uma cópia desatualizada poderia apagar
+dados dos outros. Já aconteceu em produção (sumiram os professores). Por isso
+existe `mesclarProtegido(preferido, base)`:
+
+> Para **cada coleção**: se ela está **vazia** no lado que "vence" e **cheia** no
+> outro, mantém a cheia. Ou seja, **uma coleção inteira nunca é apagada por uma
+> cópia que não a tem**. Excluir registros individuais continua funcionando.
+
+Ela é aplicada nas **três** direções: `enviarAgora`, `verificar` e `iniciar`.
+Se for mexer na sincronização, preserve esse comportamento (há testes manuais
+descritos na seção 7).
+
+### Link mágico (onboarding da equipe)
+```
+<site>/?nuvem=<PROJECT_URL_encodado>&chave=<PUBLISHABLE_KEY>
+```
+Ao abrir, o app configura a nuvem, baixa tudo e **limpa a query da URL**
+(`history.replaceState`). É assim que cada aparelho entra sem digitar nada.
+A chave publicável (anon) é feita para ficar no cliente — mas só distribua à equipe.
+
+### SQL da tabela (rodar no SQL Editor do Supabase)
+```sql
+create table if not exists painel (
+  id smallint primary key default 1,
+  dados jsonb not null default '{}'::jsonb,
+  atualizado_em timestamptz not null default now(),
+  atualizado_por text
+);
+insert into painel (id) values (1) on conflict (id) do nothing;
+alter table painel enable row level security;
+drop policy if exists "acesso app" on painel;
+create policy "acesso app" on painel
+  for all to anon, authenticated using (true) with check (true);
+```
+
+---
+
+## 4. Backup e restauração
+
+- **⚙ Logins → Baixar backup**: gera `backup-instituto-bzn-AAAA-MM-DD.json`
+  com **tudo** (dados + senhas/PINs em hash).
+- **⚙ Logins → Restaurar backup**: substitui o estado local pelo do arquivo.
+- É a rede de segurança e também o meio de **migrar** de conta/servidor.
+
+---
+
+## 5. Importação de planilhas (CSV)
+
+Tudo roda no navegador; o arquivo não sai do computador.
+- **Alunos** → "Importar planilha": detecta as colunas, o usuário confere o
+  mapeamento numa tela, vê prévia, importa. Deduplica por nome + CPF/nascimento.
+  Se houver coluna de curso, cria curso/turma e já matricula.
+- **Turmas** → "Importar inscritos": escolhe a turma e matricula a lista.
+- **Chamada** → "Importar chamada": formato matriz (nome nas linhas, datas nas
+  colunas; `P/1/x` = presente, `F/0` = falta). Cria uma chamada por data.
+
+---
+
+## 6. Como migrar para outra conta / outro servidor
+
+Ordem importa. **Faça o backup primeiro.**
+
+1. **Backup**: no app atual, ⚙ Logins → *Baixar backup* (.json). Guarde.
+2. **Código**: copie o repositório (fork, transferência, ou baixar ZIP e subir
+   num repo novo). Não há segredos no código.
+3. **Novo Supabase** (se trocar de conta): crie o projeto, rode o SQL da seção 3,
+   copie o *Project URL* e a *chave publicável*.
+4. **Hospedagem**: GitHub Pages (Settings → Pages → branch `main`) **ou**
+   Cloudflare Pages. Na Cloudflare, se a conexão com o GitHub der problema, use
+   **Direct Upload** (arrastar a pasta) — funciona igual, é site estático.
+5. **Dados**: abra o site novo → conecte à nuvem nova (endereço + chave) →
+   ⚙ Logins → *Restaurar backup*. O app sobe os dados para a nuvem nova.
+6. **Equipe**: gere o novo **link mágico** (seção 3) e distribua/QR.
+
+> ⚠️ **Trocar de domínio zera o `localStorage` de cada navegador** (é por origem).
+> Isso **não** perde dados: eles estão na nuvem/no backup. Cada aparelho só
+> precisa abrir o link mágico novo uma vez.
+
+---
+
+## 7. Como testar (sem servidor)
+
+Abra `index.html` direto no navegador (`file://`) — funciona. Para testes
+automatizados usamos Playwright headless com o Chromium do sistema, dirigindo
+`Store`/`Nuvem`/`Actions` pelo `page.evaluate` e simulando o Supabase com um
+`window.fetch` falso.
+
+Cenários que **precisam continuar passando** ao mexer na nuvem:
+1. Aparelho com dados + nuvem sem uma coleção → o aparelho **mantém** e **reenvia**.
+2. Aparelho sem uma coleção + nuvem com ela → o envio **não apaga** a da nuvem.
+3. Excluir **um** registro de uma coleção cheia → a exclusão **propaga**.
+
+Ao adicionar um arquivo `js/*.js`: inclua em `index.html` **e** na lista
+`ESSENCIAIS` do `sw.js`, subindo a versão do cache (`CACHE = "bzn-painel-vN"`).
+
+---
+
+## 8. Armadilhas conhecidas
+
+- **Aparelho novo começa vazio**: a tela de entrada detecta isso e oferece
+  "Trazer os dados do instituto" em vez de pedir para criar senha. As telas de
+  login por PIN também oferecem (`Actions.conectarNuvem`).
+- **Não sobrescrever a nuvem com estado vazio** (ver seção 3).
+- **Cache do PWA**: depois de publicar, pode ser preciso `Ctrl+Shift+R`.
+- **Limite do `localStorage`** (~5 MB): anexos são comprimidos; imagens viram
+  JPEG ≤900 px. Muitos PDFs grandes podem estourar — os `try/catch` avisam.
+- **Datas**: `<input type="date">` dispara `change` com anos incompletos; a
+  chamada ignora anos fora de 2000–2100 para não recarregar no meio da digitação.
