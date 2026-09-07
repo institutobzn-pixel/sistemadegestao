@@ -77,13 +77,25 @@ Views.atendimentos = param => {
 
 /* ---------------- agenda ---------------- */
 
+/* A presidência vê a agenda para acompanhar volume, mas só o nome do
+   paciente: especialidade, profissional e tipo de consulta revelam o
+   tratamento, e a ficha completa é do administrador. */
 function linhaAtendimento(a) {
   const pac = Store.get("pacientes", a.pacienteId);
+  const nome = pac ? U.esc(pac.nome) : "—";
+  if (!App.podeClinica()) {
+    return `
+    <tr>
+      <td style="white-space:nowrap">${U.fmtData(a.data)} ${U.esc(a.hora || "")}</td>
+      <td>${nome}</td>
+      <td>${AT.statusPill(a.status)}</td>
+    </tr>`;
+  }
   const prof = Store.get("profsaude", a.profissionalId);
   return `
     <tr>
       <td style="white-space:nowrap">${U.fmtData(a.data)} ${U.esc(a.hora || "")}</td>
-      <td>${pac ? `<a href="#/paciente/${pac.id}">${U.esc(pac.nome)}</a>` : "—"}</td>
+      <td>${pac ? `<a href="#/paciente/${pac.id}">${nome}</a>` : "—"}</td>
       <td>${AT.espChip(a.especialidade)}</td>
       <td>${U.esc(prof ? prof.nome : "—")}</td>
       <td>${U.esc(a.tipoConsulta || "—")} · ${U.esc(a.formato || "—")} · ${U.esc(a.modalidade || "—")}</td>
@@ -117,7 +129,9 @@ function viewAgenda() {
     ${Store.config.especialidades.map(e => `<option value="${U.esc(e)}" ${filtroAgenda.especialidade === e ? "selected" : ""}>${U.esc(e)}</option>`).join("")}
   </select>`;
 
-  const cab = `<thead><tr><th>Data</th><th>Paciente</th><th>Especialidade</th><th>Profissional</th><th>Tipo</th><th>Status</th><th></th></tr></thead>`;
+  const cab = App.podeClinica()
+    ? `<thead><tr><th>Data</th><th>Paciente</th><th>Especialidade</th><th>Profissional</th><th>Tipo</th><th>Status</th><th></th></tr></thead>`
+    : `<thead><tr><th>Data</th><th>Paciente</th><th>Status</th></tr></thead>`;
 
   return `
     <div class="page-head">
@@ -126,7 +140,7 @@ function viewAgenda() {
         <p>Agenda de Psicologia, Psiquiatria e Neuropsicopedagogia. Clique no paciente para abrir a ficha.</p>
       </div>
       <div class="head-actions">
-        <button class="btn accent" data-action="novoAtend">+ Novo atendimento</button>
+        ${App.podeClinica() ? `<button class="btn accent" data-action="novoAtend">+ Novo atendimento</button>` : ""}
       </div>
     </div>
     ${AT.subnav("")}
@@ -149,6 +163,8 @@ function viewAgenda() {
 }
 
 function abrirFormAtend(a) {
+  /* o formulário traz especialidade, tipo e modalidade — é dado clínico */
+  if (!App.podeClinica() && !profLogado()) { U.toast("Acesso restrito ao administrador."); return; }
   const pacs = U.ordenarPorNome(Store.col("pacientes"));
   if (!pacs.length) { U.toast("Cadastre um paciente primeiro, em Minha área → Pacientes."); return; }
   const profs = U.ordenarPorNome(Store.col("profsaude"));
@@ -227,6 +243,7 @@ Actions.novoAtend = () => abrirFormAtend({
 });
 Actions.editarAtend = id => abrirFormAtend(Store.col("atendimentos").find(x => x.id === id));
 Actions.excluirAtend = id => {
+  if (!App.podeClinica() && !profLogado()) { U.toast("Acesso restrito ao administrador."); return; }
   if (confirm("Excluir este atendimento?")) {
     Store.remover("atendimentos", id);
     U.toast("Atendimento excluído.");
@@ -500,6 +517,7 @@ function viewRelatoriosAtend() {
       </div>
     </section>
 
+    ${App.podeClinica() ? `
     <section class="grid-2">
       <div class="panel">
         <h3>Pacientes com mais de uma especialidade</h3>
@@ -521,8 +539,9 @@ function viewRelatoriosAtend() {
           <tbody>${linhasPag}</tbody>
         </table></div>` : `<div class="empty-note">Nenhum paciente pagante cadastrado.</div>`}
       </div>
-    </section>
+    </section>` : ""}
 
+    ${App.podeClinica() ? `
     <div class="panel">
       <h3>Exportar planilhas (CSV — abre no Excel)</h3>
       <p class="panel-sub">Dados do módulo de atendimentos</p>
@@ -531,7 +550,7 @@ function viewRelatoriosAtend() {
         <button class="btn" data-action="csvAtendimentos">Agenda de atendimentos</button>
         <button class="btn" data-action="csvCruzAtend">Especialidades por paciente</button>
       </div>
-    </div>
+    </div>` : ""}
   `;
 }
 
@@ -837,6 +856,7 @@ Views.aposRender = (rota, param) => {
 
 /* exportações CSV do módulo */
 Actions.csvPacientes = () => {
+  if (!App.podeClinica()) { U.toast("Exportação restrita ao administrador."); return; }
   const cab = ["Nome", "CPF", "RG", "Nascimento", "Idade", "Sexo", "Endereço", "Bairro", "Cidade",
     "Telefone", "WhatsApp", "E-mail", "Responsável", "Escolaridade", "Escola", "Profissão",
     "Estado civil", "Encaminhado por", "Situação socioeconômica", "Benefícios sociais",
@@ -859,6 +879,7 @@ Actions.csvPacientes = () => {
 };
 
 Actions.csvAtendimentos = () => {
+  if (!App.podeClinica()) { U.toast("Exportação restrita ao administrador."); return; }
   const cab = ["Data", "Hora", "Paciente", "Profissional", "Especialidade", "Tipo de consulta",
     "Formato", "Modalidade", "Status", "Observações"];
   const linhas = [...Store.col("atendimentos")]
@@ -874,6 +895,7 @@ Actions.csvAtendimentos = () => {
 };
 
 Actions.csvCruzAtend = () => {
+  if (!App.podeClinica()) { U.toast("Exportação restrita ao administrador."); return; }
   const cab = ["Paciente", "Nº de especialidades", "Especialidades"];
   const linhas = U.ordenarPorNome(Store.col("pacientes")).map(p => {
     const es = Store.especialidadesDoPaciente(p.id);
