@@ -44,7 +44,7 @@ Views.pacienteDetalhe = id => {
      Fecha também a secretaria, que não passa pelo login por PIN e chegaria
      aqui pelos links de nome da agenda e dos relatórios. */
   const prof = (typeof profLogado === "function") ? profLogado() : null;
-  const podeVer = App.ehAdmin() ||
+  const podeVer = App.podeClinica() ||
     (prof && pacientesDoProf(prof).some(x => x.id === p.id));
   if (!podeVer) return avisoSemAcessoPaciente();
 

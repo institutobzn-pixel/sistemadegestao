@@ -58,8 +58,13 @@ const App = (() => {
   const CHAVE_NIVEL = "bzn-nivel";
   const nivel = () => sessionStorage.getItem(CHAVE_NIVEL) || "";
 
-  /* admin e presidente têm acesso total (inclusive Logins e Financeiro) */
+  /* admin e presidente têm acesso total à gestão (inclusive Logins e Financeiro) */
   const ehAdmin = () => { const n = nivel(); return n === "admin" || n === "presidente"; };
+
+  /* A área particular dos atendimentos — ficha do paciente e a área de cada
+     profissional — é só do administrador. A presidência tem acesso total à
+     gestão, mas não ao dado clínico individual. */
+  const podeClinica = () => nivel() === "admin";
 
   /* permissões por nível: admin, presidente e secretaria têm acesso completo
      à operação (só admin/presidente gerenciam senhas/PINs). */
@@ -386,5 +391,5 @@ const App = (() => {
   window.addEventListener("hashchange", render);
   window.addEventListener("DOMContentLoaded", render);
 
-  return { render, abrirModal, fecharModal, nivel, ehAdmin };
+  return { render, abrirModal, fecharModal, nivel, ehAdmin, podeClinica };
 })();

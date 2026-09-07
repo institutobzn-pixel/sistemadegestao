@@ -634,7 +634,7 @@ function viewMinhaArea() {
 /* Deixa visível que quem está na área não é o profissional, e sim a
    administração — para não parecer que a separação por profissional falhou. */
 function avisoAdminNaArea(prof) {
-  if (!App.ehAdmin()) return "";
+  if (!App.podeClinica()) return "";
   return `
     <div class="alert-box warn" style="margin-bottom:14px;">
       <span class="ico">&#9881;</span>
@@ -720,7 +720,7 @@ function viewLoginProf() {
     </div>
     ${AT.subnav("minha-area")}
 
-    ${App.ehAdmin() && profs.length ? `
+    ${App.podeClinica() && profs.length ? `
     <div class="panel" style="max-width:480px;">
       <h3>&#9881; Acesso da administração</h3>
       <p class="panel-sub">Abrir a área de um profissional sem o PIN dele</p>
@@ -794,7 +794,7 @@ Actions.entrarProf = () => {
 /* A administração abre a área de um profissional sem o PIN dele. É uma
    exceção deliberada, sinalizada na tela enquanto durar. */
 Actions.entrarProfAdmin = () => {
-  if (!App.ehAdmin()) return;
+  if (!App.podeClinica()) return;
   const id = document.getElementById("admin-prof").value;
   const p = Store.get("profsaude", id);
   if (!p) return;
