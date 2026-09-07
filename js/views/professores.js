@@ -482,7 +482,7 @@ Views.professorArea = () => {
     </div>
 
     <section class="stat-strip">
-      <div class="stat-card" style="--stat-color: var(--navy-strong)">
+      <div class="stat-card" style="--stat-color: var(--navy-accent)">
         <span class="label">Minhas turmas</span>
         <span class="value">${minhasTurmas.length}</span>
         <span class="delta">${minhasTurmas.filter(t => t.status === "em andamento").length} em andamento</span>

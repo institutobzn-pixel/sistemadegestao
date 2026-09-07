@@ -427,7 +427,7 @@ function viewRelatoriosAtend() {
     ${AT.subnav("relatorios")}
 
     <section class="stat-strip">
-      <div class="stat-card" style="--stat-color: var(--navy-strong)">
+      <div class="stat-card" style="--stat-color: var(--navy-accent)">
         <span class="label">Pacientes</span>
         <span class="value">${r.pacientes}</span>
         <span class="delta">${fin.pagantes} ${U.plural(fin.pagantes, "pagante", "pagantes")} · ${fin.gratuitos} ${U.plural(fin.gratuitos, "gratuito", "gratuitos")}</span>
@@ -578,7 +578,7 @@ function viewMinhaArea() {
         <span class="value">${meus.length}</span>
         <span class="delta">${realizados} realizados</span>
       </div>
-      <div class="stat-card" style="--stat-color: var(--navy-strong)">
+      <div class="stat-card" style="--stat-color: var(--navy-accent)">
         <span class="label">Próximos</span>
         <span class="value">${proximos.length}</span>
         <span class="delta">agendados e confirmados</span>

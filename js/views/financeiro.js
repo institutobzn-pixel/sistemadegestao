@@ -132,7 +132,7 @@ Views.financeiro = sub => {
         <span class="value" style="font-size:1.4rem;">${r.saldo >= 0 ? "" : "−"}${U.moeda(Math.abs(r.saldo))}</span>
         <span class="delta">entradas − saídas</span>
       </div>
-      <div class="stat-card" style="--stat-color: var(--navy-strong)">
+      <div class="stat-card" style="--stat-color: var(--navy-accent)">
         <span class="label">Lançamentos</span>
         <span class="value">${r.lancamentos.length}</span>
         <span class="delta">${r.lancamentos.filter(l => !l.categoria).length} sem categoria</span>

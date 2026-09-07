@@ -72,7 +72,7 @@ Views.dashboard = () => {
     </div>
 
     <section class="stat-strip">
-      <div class="stat-card" style="--stat-color: var(--navy-strong)">
+      <div class="stat-card" style="--stat-color: var(--navy-accent)">
         <span class="label">Alunos únicos</span>
         <span class="value">${r.alunosUnicos}</span>
         <span class="delta">cadastrados no instituto</span>
@@ -187,7 +187,7 @@ function secaoAtendimentosDash() {
         <a href="#/atendimentos" style="font-size:0.82rem; font-weight:600;">Abrir módulo &rarr;</a>
       </div>
       <div class="stat-strip">
-        <div class="stat-card" style="--stat-color: var(--navy-strong)">
+        <div class="stat-card" style="--stat-color: var(--navy-accent)">
           <span class="label">Pacientes</span>
           <span class="value">${ra.pacientes}</span>
           <span class="delta">${g.pacGratuitos} gratuitos · ${g.pacPagos} pagos</span>

@@ -177,7 +177,7 @@ Views.graficos = () => {
         <span class="value">${g.alunosBolsistas}</span>
         <span class="delta">isentos dentro dos cursos pagos</span>
       </div>
-      <div class="stat-card" style="--stat-color: var(--navy-strong)">
+      <div class="stat-card" style="--stat-color: var(--navy-accent)">
         <span class="label">Cursos</span>
         <span class="value">${g.cursosGratuitos}<span style="font-size:1rem; color:var(--text-muted);"> grátis</span></span>
         <span class="delta">${g.cursosPagos} ${U.plural(g.cursosPagos, "curso pago", "cursos pagos")}</span>

@@ -8,6 +8,9 @@
   --navy: #041E52;
   --navy-strong: #0A2B6B;
   --navy-tint: #E8EDF7;
+  /* navy legível como TEXTO sobre a superfície do tema;
+     --navy-strong é escuro nos dois temas e serve como FUNDO */
+  --navy-accent: #0A2B6B;
   --bg: #F7F6F2;
   --surface: #FFFFFF;
   --surface-2: #EFEDE7;
@@ -42,7 +45,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --navy: #0B1B3D; --navy-strong: #122A57; --navy-tint: #1C2A4A;
+    --navy: #0B1B3D; --navy-strong: #122A57; --navy-tint: #1C2A4A; --navy-accent: #93AEF0;
     --bg: #0E1526; --surface: #172038; --surface-2: #202B47;
     --text: #EAEEF8; --text-muted: #9AA6C2; --border: #2A3554;
     --on-navy: #FFFFFF; --on-navy-muted: #8FA0C8;
@@ -62,7 +65,7 @@
   }
 }
 :root[data-theme="dark"] {
-  --navy: #0B1B3D; --navy-strong: #122A57; --navy-tint: #1C2A4A;
+  --navy: #0B1B3D; --navy-strong: #122A57; --navy-tint: #1C2A4A; --navy-accent: #93AEF0;
   --bg: #0E1526; --surface: #172038; --surface-2: #202B47;
   --text: #EAEEF8; --text-muted: #9AA6C2; --border: #2A3554;
   --on-navy: #FFFFFF; --on-navy-muted: #8FA0C8;
@@ -81,7 +84,7 @@
   --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 12px 32px -16px rgba(0,0,0,0.55);
 }
 :root[data-theme="light"] {
-  --navy: #041E52; --navy-strong: #0A2B6B; --navy-tint: #E8EDF7;
+  --navy: #041E52; --navy-strong: #0A2B6B; --navy-tint: #E8EDF7; --navy-accent: #0A2B6B;
   --bg: #F7F6F2; --surface: #FFFFFF; --surface-2: #EFEDE7;
   --text: #17233F; --text-muted: #5D6579; --border: #E3E1D8;
   --on-navy: #FFFFFF; --on-navy-muted: #A9B6D6;
@@ -199,7 +202,7 @@ nav.tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--stat-color, var(--navy));
+  border-top: 3px solid var(--stat-color, var(--navy-accent));
   border-radius: var(--radius);
   padding: 16px 18px 14px;
   box-shadow: var(--shadow);
@@ -523,7 +526,7 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
    esteja no modo escuro — ideal para imprimir em preto e branco. */
 @media print {
   :root, :root[data-theme="dark"], :root[data-theme="light"] {
-    --navy: #041E52; --navy-strong: #0A2B6B; --navy-tint: #E8EDF7;
+    --navy: #041E52; --navy-strong: #0A2B6B; --navy-tint: #E8EDF7; --navy-accent: #0A2B6B;
     --bg: #FFFFFF; --surface: #FFFFFF; --surface-2: #EFEDE7;
     --text: #17233F; --text-muted: #4A5266; --border: #C9C7BD;
     --on-navy: #17233F; --on-navy-muted: #4A5266;
