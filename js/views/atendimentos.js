@@ -17,14 +17,24 @@ const AT = {
     }[status] || "muted";
     return `<span class="pill ${cls}">${U.esc(status)}</span>`;
   },
+  /* O cadastro geral de pacientes é ferramenta de administração: cada
+     profissional acessa os seus pela própria área, nunca por esta aba. */
   subnav(ativa) {
-    const abas = [
-      ["", "Agenda"], ["pacientes", "Pacientes"],
+    const abas = [["", "Agenda"]];
+    if (App.ehAdmin()) abas.push(["pacientes", "Pacientes"]);
+    abas.push(
       ["profissionais", "Profissionais"], ["relatorios", "Relatórios"],
       ["minha-area", "Minha área"]
-    ];
+    );
     return `<div class="subtabs">${abas.map(([slug, rotulo]) =>
       `<a href="#/atendimentos${slug ? "/" + slug : ""}" class="${ativa === slug ? "active" : ""}">${rotulo}</a>`
+    ).join("")}</div>`;
+  },
+  /* abas internas da área do profissional */
+  abasMinhaArea(ativa) {
+    const abas = [["minha-area", "Visão geral"], ["meus-pacientes", "Pacientes"]];
+    return `<div class="subtabs">${abas.map(([slug, rotulo]) =>
+      `<a href="#/atendimentos/${slug}" class="${ativa === slug ? "active" : ""}">${rotulo}</a>`
     ).join("")}</div>`;
   }
 };
@@ -38,6 +48,7 @@ Views.atendimentos = param => {
   if (param === "profissionais") return viewProfSaude();
   if (param === "relatorios") return viewRelatoriosAtend();
   if (param === "minha-area") return viewMinhaArea();
+  if (param === "meus-pacientes") return viewMeusPacientes();
   return viewAgenda();
 };
 
@@ -530,23 +541,7 @@ function viewMinhaArea() {
   const faltas = meus.filter(a => a.status === "faltou").length;
   const taxaFalta = (realizados + faltas) ? Math.round((faltas / (realizados + faltas)) * 100) : null;
 
-  /* pacientes deste profissional (dados administrativos, sem informações clínicas) */
-  const idsPac = [...new Set(meus.map(a => a.pacienteId))];
-  const pacientes = U.ordenarPorNome(idsPac.map(id => Store.get("pacientes", id)).filter(Boolean));
-  const linhasPac = pacientes.map(p => {
-    const doPac = meus.filter(a => a.pacienteId === p.id);
-    const ultimo = doPac.filter(a => a.status === "realizado").sort((x, y) => y.data.localeCompare(x.data))[0];
-    const fin = p.tipoAtendimento === "pago"
-      ? `<span class="pill info">pago</span> ${p.cobranca === "mensal" ? U.moeda(p.valor) + "/mês" : U.moeda(p.valor) + "/consulta"}`
-      : `<span class="pill ok">gratuito</span>`;
-    return `<tr>
-      <td>${U.esc(p.nome)}</td>
-      <td>${U.esc(p.whatsapp || p.telefone || "—")}</td>
-      <td>${fin}</td>
-      <td>${doPac.length}</td>
-      <td>${ultimo ? U.fmtData(ultimo.data) : "—"}</td>
-    </tr>`;
-  }).join("");
+  const pacientes = pacientesDoProf(prof);
 
   const linhaMinha = a => {
     const pac = Store.get("pacientes", a.pacienteId);
@@ -571,6 +566,7 @@ function viewMinhaArea() {
       </div>
     </div>
     ${AT.subnav("minha-area")}
+    ${AT.abasMinhaArea("minha-area")}
 
     <section class="stat-strip">
       <div class="stat-card" style="--stat-color: var(--p${AT.espCorIndex(prof.especialidade)})">
@@ -603,20 +599,75 @@ function viewMinhaArea() {
     </div>
 
     <div class="panel">
-      <h3>Meus pacientes</h3>
-      <p class="panel-sub">Contato, condição financeira e histórico — sem dados clínicos</p>
-      ${pacientes.length ? `
-      <div class="table-wrap"><table>
-        <thead><tr><th>Paciente</th><th>Contato</th><th>Financeiro</th><th>Atendimentos</th><th>Último realizado</th></tr></thead>
-        <tbody>${linhasPac}</tbody>
-      </table></div>` : `<div class="empty-note">Você ainda não tem pacientes vinculados.</div>`}
-    </div>
-
-    <div class="panel">
       <h3>Histórico dos meus atendimentos</h3>
       <p class="panel-sub">Realizados, faltas e cancelados</p>
       ${historico.length ? `<div class="table-wrap"><table>${cab}<tbody>${historico.map(linhaMinha).join("")}</tbody></table></div>`
         : `<div class="empty-note">Nenhum registro ainda.</div>`}
+    </div>
+  `;
+}
+
+/* Pacientes de um profissional: os que já têm atendimento com ele e os que
+   foram cadastrados dentro da área dele (profissionalId), que ainda podem
+   não ter nenhum atendimento marcado. */
+function pacientesDoProf(prof) {
+  const ids = new Set(
+    Store.col("atendimentos")
+      .filter(a => a.profissionalId === prof.id && a.pacienteId)
+      .map(a => a.pacienteId)
+  );
+  Store.col("pacientes").forEach(p => { if (p.profissionalId === prof.id) ids.add(p.id); });
+  return U.ordenarPorNome([...ids].map(id => Store.get("pacientes", id)).filter(Boolean));
+}
+
+function viewMeusPacientes() {
+  const prof = profLogado();
+  if (!prof) return viewLoginProf();
+
+  const pacientes = pacientesDoProf(prof);
+  const meus = Store.col("atendimentos").filter(a => a.profissionalId === prof.id);
+
+  const linhas = pacientes.map(p => {
+    const doPac = meus.filter(a => a.pacienteId === p.id);
+    const ultimo = doPac.filter(a => a.status === "realizado")
+      .sort((x, y) => y.data.localeCompare(x.data))[0];
+    const letra = (p.nome[0] || "?").toUpperCase();
+    return `
+      <div class="aluno-row" data-action="verPaciente" data-id="${p.id}" title="Abrir a ficha">
+        <span class="avatar cor-${(letra.charCodeAt(0) % 8) + 1}">${U.iniciais(p.nome)}</span>
+        <div class="a-info">
+          <div class="a-nome">${U.esc(p.nome)}</div>
+          <div class="a-sub">
+            ${U.esc(p.whatsapp || p.telefone || "sem contato")} ·
+            ${doPac.length} ${U.plural(doPac.length, "atendimento", "atendimentos")} ·
+            último: ${ultimo ? U.fmtData(ultimo.data) : "—"}
+          </div>
+        </div>
+        <div class="a-chips">
+          ${p.tipoAtendimento === "pago"
+            ? `<span class="pill info">pago</span>`
+            : `<span class="pill ok">gratuito</span>`}
+        </div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="page-head">
+      <div>
+        <h2>Meus pacientes — ${U.esc(prof.nome)}</h2>
+        <p>Somente os seus pacientes. Clique em um nome para abrir a ficha e o relatório dele.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn ghost" data-action="sairProf">Sair da minha área</button>
+        <button class="btn accent" data-action="novoPacienteMeu">+ Novo paciente</button>
+      </div>
+    </div>
+    ${AT.subnav("minha-area")}
+    ${AT.abasMinhaArea("meus-pacientes")}
+
+    <div class="panel">
+      ${pacientes.length ? linhas
+        : `<div class="empty-note">Você ainda não tem pacientes.<br>Use <strong>+ Novo paciente</strong> para cadastrar o primeiro.</div>`}
     </div>
   `;
 }
@@ -686,6 +737,21 @@ Actions.sairProf = () => {
   sessionStorage.removeItem(CHAVE_PROF_LOGADO);
   U.toast("Você saiu da sua área.");
   App.render();
+};
+
+/* cadastro feito de dentro da área do profissional: o paciente já nasce
+   vinculado a ele, mesmo antes do primeiro atendimento. */
+Actions.novoPacienteMeu = () => {
+  const prof = profLogado();
+  if (!prof) return;
+  abrirFormPaciente({
+    nome: "", cpf: "", rg: "", nascimento: "", sexo: "", endereco: "", bairro: "", cidade: "",
+    telefone: "", whatsapp: "", email: "", responsavel: "", escolaridade: "", escola: "",
+    profissao: "", estadoCivil: "", encaminhadoPor: "", situacaoSocio: "", beneficios: "",
+    atingidoEnchente: "", impactoEnchentes: "", necessidadesEspeciais: "", necessidadesDesc: "",
+    observacoes: "", tipoAtendimento: "gratuito", cobranca: "", valor: "", termos: [],
+    profissionalId: prof.id
+  });
 };
 
 /* filtros da agenda */

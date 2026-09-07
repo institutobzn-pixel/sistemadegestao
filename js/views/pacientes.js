@@ -4,7 +4,24 @@
 
 let filtroPacientes = "";
 
+/* Aviso usado quando alguém chega a uma ficha que não lhe pertence.
+   Esconder a aba não basta: a rota continua digitável na barra de endereço. */
+function avisoSemAcessoPaciente() {
+  return `
+    <div class="page-head">
+      <div>
+        <h2>Acesso restrito</h2>
+        <p>Cada profissional acessa apenas os próprios pacientes, pela sua área.</p>
+      </div>
+    </div>
+    <div class="panel"><div class="empty-note">
+      Esta ficha não está entre os seus pacientes.<br>
+      <a href="#/atendimentos/meus-pacientes">Voltar para os meus pacientes</a>
+    </div></div>`;
+}
+
 Views.pacientesLista = () => {
+  if (!App.ehAdmin()) return avisoSemAcessoPaciente();
   const todos = U.ordenarPorNome(Store.col("pacientes"));
   const filtro = filtroPacientes.trim().toLowerCase();
   const lista = filtro
@@ -72,6 +89,12 @@ Views.aposRender = (rota, param) => {
 Views.pacienteDetalhe = id => {
   const p = Store.get("pacientes", id);
   if (!p) return `<div class="panel"><div class="empty-note">Paciente não encontrado.</div></div>`;
+
+  /* profissional logado só abre a ficha dos pacientes dele */
+  const prof = (typeof profLogado === "function") ? profLogado() : null;
+  if (prof && !App.ehAdmin() && !pacientesDoProf(prof).some(x => x.id === p.id)) {
+    return avisoSemAcessoPaciente();
+  }
 
   const esps = Store.especialidadesDoPaciente(p.id);
   const ats = Store.atendimentosDoPaciente(p.id);
@@ -327,6 +350,9 @@ function abrirFormPaciente(p) {
     try {
       salvo = Store.upsert("pacientes", {
         id: p.id || undefined, ...dados,
+        /* o vínculo com o profissional não é campo do formulário — preservar
+           aqui evita que uma edição desfaça o que a área dele criou */
+        profissionalId: p.profissionalId || "",
         nome: dados.nome.trim(),
         cobranca: dados.tipoAtendimento === "pago" ? (dados.cobranca || "consulta") : "",
         valor: dados.tipoAtendimento === "pago" ? (Number(dados.valor) || 0) : 0,
@@ -357,16 +383,24 @@ Actions.novoPaciente = () => abrirFormPaciente({
   telefone: "", whatsapp: "", email: "", responsavel: "", escolaridade: "", escola: "",
   profissao: "", estadoCivil: "", encaminhadoPor: "", situacaoSocio: "", beneficios: "",
   atingidoEnchente: "", impactoEnchentes: "", necessidadesEspeciais: "", necessidadesDesc: "",
-  observacoes: "", tipoAtendimento: "gratuito", cobranca: "", valor: "", termos: []
+  observacoes: "", tipoAtendimento: "gratuito", cobranca: "", valor: "", termos: [],
+  profissionalId: ""
 });
 Actions.editarPaciente = id => abrirFormPaciente(Store.get("pacientes", id));
 Actions.verPaciente = id => { location.hash = "#/paciente/" + id; };
-Actions.voltarPacientes = () => { location.hash = "#/atendimentos/pacientes"; };
+
+/* de onde a ficha veio: da área do profissional ou do cadastro geral */
+function rotaListaPacientes() {
+  return (typeof profLogado === "function" && profLogado())
+    ? "#/atendimentos/meus-pacientes"
+    : "#/atendimentos/pacientes";
+}
+Actions.voltarPacientes = () => { location.hash = rotaListaPacientes(); };
 Actions.excluirPaciente = id => {
   const p = Store.get("pacientes", id);
   if (confirm(`Excluir o paciente "${p.nome}"?\nO histórico de atendimentos dele também será removido.`)) {
     Store.remover("pacientes", id);
     U.toast("Paciente excluído.");
-    location.hash = "#/atendimentos/pacientes";
+    location.hash = rotaListaPacientes();
   }
 };

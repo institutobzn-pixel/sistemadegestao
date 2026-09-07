@@ -77,8 +77,11 @@ const App = (() => {
        profissional de saúde (que têm PIN próprio) */
     /* rotas com controle próprio: PIN de professor, de profissional e do financeiro */
     const asLogado = sessionStorage.getItem("bzn-as-logado") === "1";
+    const profSaudeLogado = !!sessionStorage.getItem("bzn-prof-logado");
     const rotaLivre = rota === "professor" ||
-      (rota === "atendimentos" && param === "minha-area") ||
+      (rota === "atendimentos" && (param === "minha-area" || param === "meus-pacientes")) ||
+      /* a ficha do paciente confere, ela mesma, se é de quem está logado */
+      (rota === "paciente" && profSaudeLogado) ||
       rota === "financeiro" ||
       rota === "assistencia" || rota === "assistido" ||
       /* a equipe da assistência social também consulta os Indicadores */
