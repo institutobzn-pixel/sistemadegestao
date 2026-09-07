@@ -138,6 +138,42 @@ const App = (() => {
     window.scrollTo(0, 0);
   }
 
+  /* Traduz o papel da conta para a sessão que o app já entende. Mantém um
+     caminho só: quem entra por conta não digita senha de perfil nem PIN. */
+  function aplicarPerfilDaConta(conta) {
+    sessionStorage.removeItem("bzn-prof-logado");
+    sessionStorage.removeItem("bzn-professor-logado");
+    sessionStorage.removeItem("bzn-as-logado");
+    sessionStorage.removeItem("bzn-fin-logado");
+    sessionStorage.removeItem(CHAVE_NIVEL);
+    switch (conta.papel) {
+      case "admin":
+      case "presidente":
+      case "secretaria":
+        sessionStorage.setItem(CHAVE_NIVEL, conta.papel); break;
+      case "prof_saude":
+        sessionStorage.setItem("bzn-prof-logado", conta.profsaudeId || ""); break;
+      case "professor":
+        sessionStorage.setItem("bzn-professor-logado", conta.professorId || ""); break;
+      case "servico_social":
+        sessionStorage.setItem("bzn-as-logado", "1"); break;
+      case "financeiro":
+        sessionStorage.setItem("bzn-fin-logado", "1"); break;
+    }
+  }
+
+  /* Onde cada perfil começa. Sem isso, quem não é da gestão entraria e cairia
+     de volta no portão, porque o painel não é rota livre para eles. */
+  function telaInicialDaConta(conta) {
+    switch (conta.papel) {
+      case "prof_saude": return "#/atendimentos/minha-area";
+      case "professor": return "#/professor";
+      case "servico_social": return "#/assistencia";
+      case "financeiro": return "#/financeiro";
+      default: return "#/dashboard";
+    }
+  }
+
   /* ---------- portão de entrada (perfis: admin, presidência, secretaria) ---------- */
   let portaoTentouBaixar = false;
   function renderPortao() {
@@ -165,8 +201,30 @@ const App = (() => {
       return;
     }
 
+    const comNuvem = typeof Nuvem !== "undefined" && Nuvem.configurada();
+
     view.innerHTML = `
+      ${comNuvem ? `
       <div class="panel" style="max-width:440px; margin:40px auto 0;">
+        <h3 style="margin-bottom:2px;">Entrar com sua conta</h3>
+        <p class="panel-sub">E-mail e senha individuais, criados pelo administrador</p>
+        <div class="form-grid" style="grid-template-columns:1fr;">
+          <div class="field">
+            <label for="conta-email">E-mail</label>
+            <input id="conta-email" type="email" autocomplete="username" placeholder="voce@institutobzn.org">
+          </div>
+          <div class="field">
+            <label for="conta-senha">Senha</label>
+            <input id="conta-senha" type="password" autocomplete="current-password">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn accent" id="conta-entrar">Entrar</button>
+        </div>
+        <p id="conta-aviso" class="panel-sub" style="color:var(--danger); min-height:1.2em;"></p>
+      </div>` : ""}
+
+      <div class="panel" style="max-width:440px; margin:${comNuvem ? "18px" : "40px"} auto 0;">
         <h3 style="margin-bottom:2px;">${primeiraVez ? "Primeiro acesso neste aparelho" : "Acesso restrito"}</h3>
         <p class="panel-sub">${primeiraVez
           ? "Se o instituto <strong>já usa</strong> o sistema, clique em <strong>“☁️ Trazer os dados”</strong> abaixo — <strong>não crie senha nova</strong>. Crie a senha só se for a primeiríssima vez do instituto."
@@ -253,6 +311,46 @@ const App = (() => {
       sessionStorage.setItem(CHAVE_NIVEL, perfil);
       render();
     };
+    /* ---- entrada por conta (Supabase Auth) ---- */
+    const entrarConta = async () => {
+      const campoE = document.getElementById("conta-email");
+      const campoS = document.getElementById("conta-senha");
+      const aviso = document.getElementById("conta-aviso");
+      if (!campoE || !campoS) return;
+      const mostrar = m => { if (aviso) aviso.textContent = m; };
+      const mail = campoE.value.trim();
+      if (!mail || !campoS.value) { mostrar("Preencha e-mail e senha."); return; }
+
+      mostrar("Entrando…");
+      const r = await Auth.entrar(mail, campoS.value);
+      campoS.value = "";
+      if (!r.ok) { mostrar(r.msg); return; }
+
+      /* aparelho novo pode ainda não ter a lista de contas: busca antes de mapear */
+      if (!Store.contaPorEmail(mail)) {
+        try { await Nuvem.verificar(); } catch (e) { /* segue com o que houver */ }
+      }
+      const conta = Store.contaPorEmail(mail);
+      if (!conta) {
+        Auth.sair();
+        mostrar("Conta autenticada, mas sem perfil definido neste sistema. Peça ao administrador para cadastrá-la em ⚙ Logins.");
+        return;
+      }
+      aplicarPerfilDaConta(conta);
+      U.toast(`Bem-vindo(a)${conta.nome ? ", " + conta.nome.split(" ")[0] : ""}!`);
+      const destino = telaInicialDaConta(conta);
+      if (location.hash === destino) render(); else location.hash = destino;
+    };
+
+    const btnConta = document.getElementById("conta-entrar");
+    if (btnConta) {
+      btnConta.addEventListener("click", entrarConta);
+      ["conta-email", "conta-senha"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("keydown", ev => { if (ev.key === "Enter") entrarConta(); });
+      });
+    }
+
     document.getElementById("portao-entrar").addEventListener("click", entrar);
     view.querySelectorAll("input").forEach(i =>
       i.addEventListener("keydown", ev => { if (ev.key === "Enter") entrar(); }));
@@ -379,6 +477,13 @@ const App = (() => {
 
   const sair = () => {
     sessionStorage.removeItem(CHAVE_NIVEL);
+    /* quem entrou por conta sai da conta também, senão continuaria
+       autenticado na nuvem depois de "sair" do sistema */
+    if (typeof Auth !== "undefined" && Auth.logado()) Auth.sair();
+    sessionStorage.removeItem("bzn-prof-logado");
+    sessionStorage.removeItem("bzn-professor-logado");
+    sessionStorage.removeItem("bzn-as-logado");
+    sessionStorage.removeItem("bzn-fin-logado");
     document.getElementById("nav-tabs").classList.remove("open");
     location.hash = "#/dashboard";
     render();

@@ -136,6 +136,43 @@ const Store = (() => {
   function conferirSenha(nivel, senha) {
     return temSenha(nivel) && U.hashPin(String(senha)) === db.config[CAMPO_SENHA[nivel]];
   }
+  /* ---------- contas de e-mail (Supabase Auth) ----------
+     A conta autentica no Supabase; o papel dela é definido aqui, pelo
+     administrador. Guardado no config, então sincroniza junto com o resto. */
+  function contas() {
+    if (!Array.isArray(db.config.contas)) db.config.contas = [];
+    return db.config.contas;
+  }
+  const normEmail = e => String(e || "").trim().toLowerCase();
+
+  function contaPorEmail(email) {
+    const e = normEmail(email);
+    return contas().find(c => normEmail(c.email) === e) || null;
+  }
+
+  function salvarConta(c) {
+    const lista = contas();
+    const e = normEmail(c.email);
+    if (!e) throw new Error("E-mail obrigatório.");
+    const i = lista.findIndex(x => normEmail(x.email) === e);
+    const registro = {
+      email: e,
+      nome: String(c.nome || "").trim(),
+      papel: c.papel || "secretaria",
+      profsaudeId: c.profsaudeId || "",
+      professorId: c.professorId || ""
+    };
+    if (i >= 0) lista[i] = registro; else lista.push(registro);
+    salvar();
+    return registro;
+  }
+
+  function removerConta(email) {
+    const e = normEmail(email);
+    db.config.contas = contas().filter(c => normEmail(c.email) !== e);
+    salvar();
+  }
+
   /* pergunta de segurança — protege a recuperação da senha do admin.
      A resposta é guardada como hash, normalizada (minúsculas, sem acentos/espaços). */
   function normalizaResposta(s) {
@@ -1009,6 +1046,7 @@ const Store = (() => {
     atendimentosDoPaciente, especialidadesDoPaciente, cruzamentoAtendimentos,
     resumoAtendimentos, atendimentosPorProfissional, resumoFinanceiro, resumoFinanceiroCursos,
     enchenteGeral, encaminhamentoGeral, resumoGratuidade, condicaoAluno,
+    contas, contaPorEmail, salvarConta, removerConta,
     exportarJSON, importarJSON, limparTudo,
     snapshot, aplicarRemoto,
     get config() { return db.config; }

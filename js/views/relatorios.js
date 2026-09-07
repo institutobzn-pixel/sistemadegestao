@@ -201,6 +201,146 @@ Actions.csvCruzamento = () => {
   U.toast("Planilha de cruzamento exportada.");
 };
 
+/* ---------- contas de e-mail (Supabase Auth) ---------- */
+
+const PAPEIS_CONTA = [
+  ["admin", "Administração"],
+  ["presidente", "Presidência"],
+  ["secretaria", "Secretaria"],
+  ["financeiro", "Gestor financeiro"],
+  ["servico_social", "Serviço social"],
+  ["prof_saude", "Profissional de saúde"],
+  ["professor", "Professor(a)"]
+];
+const rotuloPapel = p => (PAPEIS_CONTA.find(x => x[0] === p) || ["", p])[1];
+
+function painelContas() {
+  const conectada = typeof Nuvem !== "undefined" && Nuvem.configurada();
+  const lista = Store.contas();
+  const linhas = lista.map(c => {
+    let vinculo = "";
+    if (c.papel === "prof_saude") {
+      const p = Store.get("profsaude", c.profsaudeId);
+      vinculo = p ? p.nome : "<em>profissional não encontrado</em>";
+    } else if (c.papel === "professor") {
+      const p = Store.get("professores", c.professorId);
+      vinculo = p ? p.nome : "<em>professor não encontrado</em>";
+    }
+    return `<tr>
+      <td>${U.esc(c.email)}</td>
+      <td>${U.esc(c.nome || "—")}</td>
+      <td>${U.esc(rotuloPapel(c.papel))}${vinculo ? " · " + vinculo : ""}</td>
+      <td style="white-space:nowrap">
+        <button class="icon-btn" data-action="editarConta" data-id="${U.esc(c.email)}" title="Editar" aria-label="Editar conta">&#9998;</button>
+        <button class="icon-btn" data-action="removerConta" data-id="${U.esc(c.email)}" title="Remover" aria-label="Remover conta">&#128465;</button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <div class="panel">
+      <h3>&#128100; Contas de acesso por e-mail</h3>
+      <p class="panel-sub">
+        Cada pessoa entra com e-mail e senha próprios. A senha é criada e guardada
+        pelo Supabase, não por este sistema — aqui você define apenas qual perfil
+        cada conta tem.
+      </p>
+      ${conectada ? "" : `<div class="alert-box warn" style="margin-bottom:12px;">
+        <span class="ico">&#9888;&#65039;</span>
+        <div><p>A nuvem ainda não está conectada neste aparelho. As contas só funcionam com a nuvem configurada.</p></div>
+      </div>`}
+      ${lista.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>E-mail</th><th>Nome</th><th>Perfil</th><th></th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table></div>` : `<div class="empty-note">Nenhuma conta cadastrada ainda.</div>`}
+      <div class="head-actions" style="margin-top:12px;">
+        <button class="btn accent" data-action="novaConta">+ Nova conta</button>
+      </div>
+      <div class="alert-box info" style="margin-top:14px;">
+        <span class="ico">&#128274;</span>
+        <div><p>Cadastrar aqui <strong>não cria</strong> a conta no Supabase. Crie-a primeiro no painel do
+        Supabase, em <strong>Authentication → Users → Add user</strong>, com o mesmo e-mail — e depois
+        registre o perfil dela aqui.</p></div>
+      </div>
+    </div>`;
+}
+
+function abrirFormConta(c) {
+  const optPapel = PAPEIS_CONTA.map(([v, r]) =>
+    `<option value="${v}" ${c.papel === v ? "selected" : ""}>${r}</option>`).join("");
+  const optPS = ['<option value="">— selecione —</option>'].concat(
+    U.ordenarPorNome(Store.col("profsaude")).map(p =>
+      `<option value="${p.id}" ${c.profsaudeId === p.id ? "selected" : ""}>${U.esc(p.nome)}</option>`)).join("");
+  const optPR = ['<option value="">— selecione —</option>'].concat(
+    U.ordenarPorNome(Store.col("professores")).map(p =>
+      `<option value="${p.id}" ${c.professorId === p.id ? "selected" : ""}>${U.esc(p.nome)}</option>`)).join("");
+
+  App.abrirModal(c.email ? "Editar conta" : "Nova conta", `
+    <form>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="fc-email">E-mail *</label>
+          <input id="fc-email" name="email" type="email" required value="${U.esc(c.email || "")}"
+                 ${c.email ? "readonly" : ""} placeholder="pessoa@institutobzn.org">
+        </div>
+        <div class="field full">
+          <label for="fc-nome">Nome</label>
+          <input id="fc-nome" name="nome" value="${U.esc(c.nome || "")}">
+        </div>
+        <div class="field full">
+          <label for="fc-papel">Perfil</label>
+          <select id="fc-papel" name="papel">${optPapel}</select>
+        </div>
+        <div class="field full" id="campo-ps" hidden>
+          <label for="fc-ps">Qual profissional de saúde</label>
+          <select id="fc-ps" name="profsaudeId">${optPS}</select>
+        </div>
+        <div class="field full" id="campo-pr" hidden>
+          <label for="fc-pr">Qual professor(a)</label>
+          <select id="fc-pr" name="professorId">${optPR}</select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
+        <button type="submit" class="btn accent">Salvar conta</button>
+      </div>
+    </form>`, dados => {
+    if (!String(dados.email || "").trim()) return false;
+    if (dados.papel === "prof_saude" && !dados.profsaudeId) {
+      alert("Escolha a qual profissional de saúde esta conta pertence.");
+      return false;
+    }
+    if (dados.papel === "professor" && !dados.professorId) {
+      alert("Escolha a qual professor(a) esta conta pertence.");
+      return false;
+    }
+    Store.salvarConta(dados);
+    U.toast("Conta salva.");
+    App.render();
+  }, c.email ? c : null);
+
+  /* mostra o vínculo só para os perfis que precisam dele */
+  const sel = document.getElementById("fc-papel");
+  const ajustar = () => {
+    document.getElementById("campo-ps").hidden = sel.value !== "prof_saude";
+    document.getElementById("campo-pr").hidden = sel.value !== "professor";
+  };
+  sel.addEventListener("change", ajustar);
+  ajustar();
+}
+
+Actions.novaConta = () => abrirFormConta({ email: "", nome: "", papel: "secretaria", profsaudeId: "", professorId: "" });
+Actions.editarConta = email => {
+  const c = Store.contaPorEmail(email);
+  if (c) abrirFormConta(c);
+};
+Actions.removerConta = email => {
+  if (!confirm(`Remover o acesso de "${email}"?\n\nA conta continua existindo no Supabase — remova lá também para bloquear a entrada por completo.`)) return;
+  Store.removerConta(email);
+  U.toast("Conta removida deste sistema.");
+  App.render();
+};
+
 /* ---------- conexão com a nuvem (Supabase) ---------- */
 
 function painelNuvem() {
@@ -358,6 +498,8 @@ Views.seguranca = () => {
     </div>
 
     ${painelNuvem()}
+
+    ${painelContas()}
 
     ${item("Senha do administrador",
       "A senha principal do sistema. Guarde em local seguro — quem a tem controla todos os acessos.",

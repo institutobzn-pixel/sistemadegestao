@@ -43,8 +43,17 @@ const Nuvem = (() => {
     ligado = false;
   }
 
-  function cabecalhos(extra) {
-    return Object.assign({ "apikey": key, "Authorization": "Bearer " + key }, extra || {});
+  /* O apikey é sempre a chave publicável — é ela que identifica o projeto.
+     O Authorization é que muda: com conta, vai o token do usuário; sem conta,
+     a própria chave publicável, que é como o app funcionava antes.
+     É assíncrono porque renovar um token expirado é chamada de rede. */
+  async function cabecalhos(extra) {
+    let autorizacao = key;
+    if (typeof Auth !== "undefined" && Auth.logado()) {
+      const t = await Auth.token();
+      if (t) autorizacao = t;
+    }
+    return Object.assign({ "apikey": key, "Authorization": "Bearer " + autorizacao }, extra || {});
   }
 
   function hash(str) {
@@ -56,7 +65,7 @@ const Nuvem = (() => {
 
   async function baixar() {
     const r = await fetch(`${url}/rest/v1/painel?id=eq.1&select=dados,atualizado_em`, {
-      headers: cabecalhos(), cache: "no-store"
+      headers: await cabecalhos(), cache: "no-store"
     });
     if (!r.ok) {
       let dica = "";
@@ -72,7 +81,7 @@ const Nuvem = (() => {
     const carimbo = new Date().toISOString();
     const r = await fetch(`${url}/rest/v1/painel?id=eq.1`, {
       method: "PATCH",
-      headers: cabecalhos({ "Content-Type": "application/json", "Prefer": "return=minimal" }),
+      headers: await cabecalhos({ "Content-Type": "application/json", "Prefer": "return=minimal" }),
       body: JSON.stringify({ dados: dados, atualizado_em: carimbo, atualizado_por: por || "app" })
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -226,8 +235,10 @@ const Nuvem = (() => {
     }
   }
 
+  function chavePublica() { return key; }
+
   return {
-    configurada, endereco, salvarConfig, limparConfig,
+    configurada, endereco, chavePublica, salvarConfig, limparConfig,
     agendarEnvio, enviarAgora, verificar, iniciar, testar,
     statusAtual
   };
