@@ -18,12 +18,15 @@ const AT = {
     return `<span class="pill ${cls}">${U.esc(status)}</span>`;
   },
   /* Não existe lista geral de pacientes: o paciente pertence ao profissional
-     que o atende, e só aparece dentro da área dele. */
+     que o atende, e só aparece dentro da área dele.
+     A agenda geral, o cadastro de profissionais e os relatórios reúnem os
+     pacientes de todos — são de administração e presidência. Quem não é
+     administrador chega apenas à própria área. */
   subnav(ativa) {
-    const abas = [
-      ["", "Agenda"], ["profissionais", "Profissionais"],
-      ["relatorios", "Relatórios"], ["minha-area", "Minha área"]
-    ];
+    const abas = App.ehAdmin()
+      ? [["", "Agenda"], ["profissionais", "Profissionais"],
+         ["relatorios", "Relatórios"], ["minha-area", "Minha área"]]
+      : [["minha-area", "Minha área"]];
     return `<div class="subtabs">${abas.map(([slug, rotulo]) =>
       `<a href="#/atendimentos${slug ? "/" + slug : ""}" class="${ativa === slug ? "active" : ""}">${rotulo}</a>`
     ).join("")}</div>`;
@@ -41,12 +44,34 @@ const STATUS_ATEND = ["agendado", "confirmado", "realizado", "faltou", "cancelad
 
 let filtroAgenda = { status: "", especialidade: "" };
 
+/* Tela para quem chegou a uma parte de Atendimentos que não lhe cabe.
+   Esconder a aba não basta: a rota continua digitável na barra de endereço. */
+function viewAtendRestrito() {
+  return `
+    <div class="page-head">
+      <div>
+        <h2>Acesso restrito</h2>
+        <p>A agenda geral, o cadastro de profissionais e os relatórios reúnem os pacientes de todos os profissionais.</p>
+      </div>
+    </div>
+    ${AT.subnav("")}
+    <div class="panel"><div class="empty-note">
+      Esta parte é da administração e da presidência.<br>
+      Se você é profissional de saúde, entre na sua área para ver os seus pacientes e a sua agenda.<br><br>
+      <a href="#/atendimentos/minha-area">Ir para Minha área</a>
+    </div></div>`;
+}
+
 Views.atendimentos = param => {
+  /* a área do profissional tem controle próprio, por PIN */
+  if (param === "minha-area") return viewMinhaArea();
+  if (param === "meus-pacientes") return viewMeusPacientes();
+
+  if (!App.ehAdmin()) return viewAtendRestrito();
+
   if (param === "pacientes") return Views.pacientesLista();
   if (param === "profissionais") return viewProfSaude();
   if (param === "relatorios") return viewRelatoriosAtend();
-  if (param === "minha-area") return viewMinhaArea();
-  if (param === "meus-pacientes") return viewMeusPacientes();
   return viewAgenda();
 };
 

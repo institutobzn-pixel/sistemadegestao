@@ -79,7 +79,10 @@ const App = (() => {
     const asLogado = sessionStorage.getItem("bzn-as-logado") === "1";
     const profSaudeLogado = !!sessionStorage.getItem("bzn-prof-logado");
     const rotaLivre = rota === "professor" ||
-      (rota === "atendimentos" && (param === "minha-area" || param === "meus-pacientes")) ||
+      /* quem entrou por PIN de profissional resolve tudo dentro de
+         Atendimentos: a própria área abre, o resto recusa com aviso claro
+         em vez de jogá-lo no portão de senha da administração */
+      (rota === "atendimentos" && (param === "minha-area" || param === "meus-pacientes" || profSaudeLogado)) ||
       /* a ficha do paciente confere, ela mesma, se é de quem está logado */
       (rota === "paciente" && profSaudeLogado) ||
       rota === "financeiro" ||

@@ -40,11 +40,13 @@ Views.pacienteDetalhe = id => {
   const p = Store.get("pacientes", id);
   if (!p) return `<div class="panel"><div class="empty-note">Paciente não encontrado.</div></div>`;
 
-  /* profissional logado só abre a ficha dos pacientes dele */
+  /* Só abre a ficha quem é administração ou o profissional dono do paciente.
+     Fecha também a secretaria, que não passa pelo login por PIN e chegaria
+     aqui pelos links de nome da agenda e dos relatórios. */
   const prof = (typeof profLogado === "function") ? profLogado() : null;
-  if (prof && !App.ehAdmin() && !pacientesDoProf(prof).some(x => x.id === p.id)) {
-    return avisoSemAcessoPaciente();
-  }
+  const podeVer = App.ehAdmin() ||
+    (prof && pacientesDoProf(prof).some(x => x.id === p.id));
+  if (!podeVer) return avisoSemAcessoPaciente();
 
   const esps = Store.especialidadesDoPaciente(p.id);
   const ats = Store.atendimentosDoPaciente(p.id);
