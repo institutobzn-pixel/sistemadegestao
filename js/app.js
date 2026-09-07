@@ -327,9 +327,12 @@ const App = (() => {
   const modalBody = document.getElementById("modal-body");
   const modalTitle = document.getElementById("modal-title");
 
-  function abrirModal(titulo, html, aoEnviar) {
+  /* `registro` é opcional: quando vem, o modal mostra no rodapé quem
+     cadastrou e quem alterou por último. Como todo formulário de edição
+     passa por aqui, basta o chamador entregar o registro. */
+  function abrirModal(titulo, html, aoEnviar, registro) {
     modalTitle.textContent = titulo;
-    modalBody.innerHTML = html;
+    modalBody.innerHTML = html + (registro ? U.carimbo(registro) : "");
     backdrop.hidden = false;
     const form = modalBody.querySelector("form");
     if (form && aoEnviar) {

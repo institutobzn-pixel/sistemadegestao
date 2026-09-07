@@ -162,6 +162,8 @@ Views.alunoDetalhe = id => {
       </div>
     </div>
 
+    ${U.carimbo(a)}
+
     <div class="head-actions">
       <button class="btn danger" data-action="excluirAluno" data-id="${a.id}">Excluir aluno</button>
     </div>
@@ -286,7 +288,7 @@ function abrirFormAluno(a) {
     U.toast("Aluno salvo.");
     if (!a.id) location.hash = "#/aluno/" + salvo.id;
     else App.render();
-  });
+  }, a);
   Anexos.iniciar(a.termos, 5);
   Anexos.ligar();
 }

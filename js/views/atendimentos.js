@@ -185,7 +185,7 @@ function abrirFormAtend(a) {
     Store.upsert("atendimentos", { id: a.id || undefined, ...dados });
     U.toast("Atendimento salvo.");
     App.render();
-  });
+  }, a);
 
   /* ao escolher o profissional, preenche a especialidade automaticamente */
   const selProf = document.getElementById("fat-prof");
@@ -337,7 +337,7 @@ function abrirFormProfSaude(p) {
     }
     U.toast("Profissional salvo.");
     App.render();
-  });
+  }, p);
   Anexos.iniciar(p.arquivos, 5);
   Anexos.ligar();
 }

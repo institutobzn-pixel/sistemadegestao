@@ -379,13 +379,31 @@ const Store = (() => {
   const col = nome => db[nome];
   const get = (nome, id) => db[nome].find(x => x.id === id) || null;
 
+  /* Carimbo de autoria: quem cadastrou e quem alterou por último.
+     É registro de boa-fé para o trabalho do dia a dia — como tudo roda no
+     navegador, não serve como prova contra adulteração. */
   function upsert(nome, obj) {
+    const ator = U.atorAtual();
+    const agora = U.agoraISO();
     if (obj.id) {
       const i = db[nome].findIndex(x => x.id === obj.id);
-      if (i >= 0) db[nome][i] = { ...db[nome][i], ...obj };
-      else db[nome].push(obj);
+      if (i >= 0) {
+        const anterior = db[nome][i];
+        db[nome][i] = {
+          ...anterior, ...obj,
+          /* a criação é do registro, não desta edição */
+          criadoPor: anterior.criadoPor || obj.criadoPor || "",
+          criadoEm: anterior.criadoEm || obj.criadoEm || "",
+          alteradoPor: ator, alteradoEm: agora
+        };
+        obj = db[nome][i];
+      } else {
+        db[nome].push(Object.assign(obj, { criadoPor: ator, criadoEm: agora }));
+      }
     } else {
       obj.id = U.uid();
+      obj.criadoPor = ator;
+      obj.criadoEm = agora;
       db[nome].push(obj);
     }
     salvar();

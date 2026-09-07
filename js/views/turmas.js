@@ -125,7 +125,7 @@ function abrirFormTurma(t) {
     });
     U.toast("Turma salva.");
     App.render();
-  });
+  }, t);
 }
 
 /* cria um curso na hora, sem sair do formulário de turma */

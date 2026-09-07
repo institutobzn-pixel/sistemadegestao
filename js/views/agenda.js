@@ -162,7 +162,7 @@ function abrirFormEvento(e) {
     Store.upsert("eventos", novo);
     U.toast("Evento salvo.");
     App.render();
-  });
+  }, e);
 }
 
 Actions.novoEvento = () => abrirFormEvento({

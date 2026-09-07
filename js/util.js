@@ -29,6 +29,56 @@ const U = {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   },
 
+  /* ---------- autoria dos registros ----------
+     Quem está operando o sistema agora. O perfil com senha vem primeiro:
+     se a administração abriu a área de um profissional, quem age é a
+     administração, e é isso que deve ficar registrado. */
+  atorAtual() {
+    const nome = id => {
+      try { const p = Store.get("profsaude", id) || Store.get("professores", id); return p ? p.nome : ""; }
+      catch (e) { return ""; }
+    };
+    try {
+      const nivel = sessionStorage.getItem("bzn-nivel");
+      if (nivel === "admin") return "Administração";
+      if (nivel === "presidente") return "Presidência";
+      if (nivel === "secretaria") return "Secretaria";
+
+      const ps = sessionStorage.getItem("bzn-prof-logado");
+      if (ps) return nome(ps) || "Profissional de saúde";
+
+      const pr = sessionStorage.getItem("bzn-professor-logado");
+      if (pr) return nome(pr) || "Professor(a)";
+
+      if (sessionStorage.getItem("bzn-as-logado") === "1") return "Serviço social";
+      if (sessionStorage.getItem("bzn-fin-logado") === "1") return "Gestor financeiro";
+    } catch (e) { /* sessionStorage bloqueado */ }
+    return "";
+  },
+
+  /* momento atual em ISO curto, para ordenar e exibir */
+  agoraISO() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  },
+
+  fmtMomento(iso) {
+    if (!iso) return "";
+    const [data, hora] = String(iso).split("T");
+    return U.fmtData(data) + (hora ? " às " + hora : "");
+  },
+
+  /* Linha discreta com quem cadastrou e quem alterou por último.
+     Devolve "" para registros antigos, que não têm carimbo. */
+  carimbo(o) {
+    if (!o || (!o.criadoPor && !o.alteradoPor)) return "";
+    const partes = [];
+    if (o.criadoPor) partes.push(`Cadastrado por <strong>${U.esc(o.criadoPor)}</strong>${o.criadoEm ? " em " + U.fmtMomento(o.criadoEm) : ""}`);
+    if (o.alteradoPor) partes.push(`última alteração por <strong>${U.esc(o.alteradoPor)}</strong>${o.alteradoEm ? " em " + U.fmtMomento(o.alteradoEm) : ""}`);
+    return `<p class="carimbo">${partes.join(" · ")}</p>`;
+  },
+
   idade(nascISO) {
     if (!nascISO) return null;
     const n = new Date(nascISO + "T00:00:00");

@@ -212,6 +212,17 @@ nav.tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px
 .stat-card .value { font-size: 1.9rem; font-weight: 800; line-height: 1; color: var(--stat-color, var(--text)); }
 .stat-card .delta { font-size: 0.78rem; color: var(--text-muted); }
 
+/* ---------- carimbo de autoria ---------- */
+.carimbo {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.carimbo strong { color: var(--text); font-weight: 600; }
+
 /* ---------- barras ---------- */
 .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; }
 .bar-row:last-of-type { margin-bottom: 0; }

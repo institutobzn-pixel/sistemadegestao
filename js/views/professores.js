@@ -227,7 +227,7 @@ function abrirFormProf(p) {
     }
     U.toast("Professor salvo.");
     App.render();
-  });
+  }, p);
   ligarUploadArquivos();
 }
 
@@ -345,7 +345,7 @@ function abrirFormEquipe(p) {
     }
     U.toast("Registro salvo.");
     App.render();
-  });
+  }, p);
   ligarUploadArquivos();
 }
 

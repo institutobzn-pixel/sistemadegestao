@@ -200,7 +200,7 @@ function abrirFormCurso(c) {
     }
     U.toast("Curso salvo.");
     App.render();
-  });
+  }, c);
   ligarRemocaoModulos();
   renderFotosForm();
   /* habilita/desabilita campos financeiros conforme o tipo */

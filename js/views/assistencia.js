@@ -199,6 +199,8 @@ Views.assistidoDetalhe = id => {
       </table></div>` : `<div class="empty-note">Nenhum compromisso registrado. Use a sub-aba Agenda interna.</div>`}
     </div>
 
+    ${U.carimbo(p)}
+
     <div class="head-actions">
       <button class="btn danger" data-action="excluirAssistido" data-id="${p.id}">Excluir cadastro</button>
     </div>`;
@@ -288,7 +290,7 @@ function abrirFormAssistido(p) {
     U.toast("Cadastro salvo.");
     if (!p.id) location.hash = "#/assistido/" + salvo.id;
     else App.render();
-  });
+  }, p);
   Anexos.iniciar(p.documentos, 5);
   Anexos.ligar();
 }
@@ -527,7 +529,7 @@ function abrirFormCompromisso(c) {
     Store.upsert("compromissosAS", { id: c.id || undefined, ...dados, titulo: dados.titulo.trim() });
     U.toast("Compromisso salvo.");
     App.render();
-  });
+  }, c);
 }
 
 Actions.novoCompromisso = () => abrirFormCompromisso({ titulo: "", data: U.hojeISO(), hora: "", assistidoId: "", responsavel: "", status: "agendado", obs: "" });
@@ -641,7 +643,7 @@ function abrirFormProfSocial(p) {
     }
     U.toast("Profissional salvo.");
     App.render();
-  });
+  }, p);
   Anexos.iniciar(p.documentos, 5);
   Anexos.ligar();
 }

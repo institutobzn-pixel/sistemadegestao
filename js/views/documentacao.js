@@ -128,7 +128,7 @@ function abrirFormDoc(d) {
     }
     U.toast("Documento salvo.");
     App.render();
-  });
+  }, d);
 
   /* alterna entre enviar arquivo e colar link; só 1 arquivo aqui */
   Anexos.iniciar(d.arquivo ? [d.arquivo] : [], 1);
@@ -233,7 +233,7 @@ function abrirFormLink(l) {
     Store.upsert("linksImagens", { id: l.id || undefined, ...dados, assunto: dados.assunto.trim(), url: dados.url.trim() });
     U.toast("Link salvo.");
     App.render();
-  });
+  }, l);
 }
 
 Actions.novoLink = () => abrirFormLink({ assunto: "", titulo: "", url: "", obs: "" });
