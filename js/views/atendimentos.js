@@ -17,15 +17,13 @@ const AT = {
     }[status] || "muted";
     return `<span class="pill ${cls}">${U.esc(status)}</span>`;
   },
-  /* O cadastro geral de pacientes é ferramenta de administração: cada
-     profissional acessa os seus pela própria área, nunca por esta aba. */
+  /* Não existe lista geral de pacientes: o paciente pertence ao profissional
+     que o atende, e só aparece dentro da área dele. */
   subnav(ativa) {
-    const abas = [["", "Agenda"]];
-    if (App.ehAdmin()) abas.push(["pacientes", "Pacientes"]);
-    abas.push(
-      ["profissionais", "Profissionais"], ["relatorios", "Relatórios"],
-      ["minha-area", "Minha área"]
-    );
+    const abas = [
+      ["", "Agenda"], ["profissionais", "Profissionais"],
+      ["relatorios", "Relatórios"], ["minha-area", "Minha área"]
+    ];
     return `<div class="subtabs">${abas.map(([slug, rotulo]) =>
       `<a href="#/atendimentos${slug ? "/" + slug : ""}" class="${ativa === slug ? "active" : ""}">${rotulo}</a>`
     ).join("")}</div>`;

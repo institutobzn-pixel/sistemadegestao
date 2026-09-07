@@ -2,8 +2,6 @@
    (com área financeira: gratuito/pago, cobrança mensal ou por consulta). */
 "use strict";
 
-let filtroPacientes = "";
-
 /* Aviso usado quando alguém chega a uma ficha que não lhe pertence.
    Esconder a aba não basta: a rota continua digitável na barra de endereço. */
 function avisoSemAcessoPaciente() {
@@ -20,71 +18,23 @@ function avisoSemAcessoPaciente() {
     </div></div>`;
 }
 
-Views.pacientesLista = () => {
-  if (!App.ehAdmin()) return avisoSemAcessoPaciente();
-  const todos = U.ordenarPorNome(Store.col("pacientes"));
-  const filtro = filtroPacientes.trim().toLowerCase();
-  const lista = filtro
-    ? todos.filter(p => (p.nome + " " + (p.cpf || "") + " " + (p.telefone || "")).toLowerCase().includes(filtro))
-    : todos;
-
-  let html = "";
-  let letraAtual = "";
-  for (const p of lista) {
-    const letra = (p.nome[0] || "?").toUpperCase();
-    if (letra !== letraAtual) {
-      letraAtual = letra;
-      html += `<div class="alpha-letter">${letra}</div>`;
-    }
-    const esps = Store.especialidadesDoPaciente(p.id);
-    html += `
-      <div class="aluno-row" data-action="verPaciente" data-id="${p.id}">
-        <span class="avatar cor-${(letra.charCodeAt(0) % 8) + 1}">${U.iniciais(p.nome)}</span>
-        <div class="a-info">
-          <div class="a-nome">${U.esc(p.nome)}</div>
-          <div class="a-sub">${U.esc(p.telefone || p.whatsapp || "")}${(p.telefone || p.whatsapp) && p.email ? " · " : ""}${U.esc(p.email || "")}</div>
-        </div>
-        <div class="a-chips">
-          ${p.tipoAtendimento === "pago" ? `<span class="pill info">pago</span>` : ""}
-          ${esps.map(AT.espChip).join("")}
-        </div>
-      </div>`;
-  }
-
-  return `
-    <div class="page-head">
-      <div>
-        <h2>Pacientes</h2>
-        <p>Cadastro único por paciente, em ordem alfabética. Clique para abrir a ficha completa.</p>
-      </div>
-      <div class="head-actions">
-        <input class="search-input" id="busca-paciente" type="search" placeholder="Buscar por nome, CPF ou telefone…" value="${U.esc(filtroPacientes)}">
-        <button class="btn accent" data-action="novoPaciente">+ Novo paciente</button>
-      </div>
+/* A rota antiga da lista geral continua existindo — links e favoritos antigos
+   apontam para ela — mas não lista mais ninguém: explica onde os pacientes
+   passaram a ficar. */
+Views.pacientesLista = () => `
+  <div class="page-head">
+    <div>
+      <h2>Pacientes</h2>
+      <p>Cada paciente pertence ao profissional que o atende.</p>
     </div>
-    ${AT.subnav("pacientes")}
-    <div class="panel">
-      ${lista.length ? html : `<div class="empty-note">${filtro ? "Nenhum paciente encontrado para essa busca." : "Nenhum paciente cadastrado ainda."}</div>`}
-    </div>
-  `;
-};
-
-/* busca com foco preservado */
-const aposRenderPacientes = Views.aposRender;
-Views.aposRender = (rota, param) => {
-  if (aposRenderPacientes) aposRenderPacientes(rota, param);
-  if (rota !== "atendimentos" || param !== "pacientes") return;
-  const campo = document.getElementById("busca-paciente");
-  if (campo) {
-    campo.addEventListener("input", () => {
-      filtroPacientes = campo.value;
-      const pos = campo.selectionStart;
-      App.render();
-      const novo = document.getElementById("busca-paciente");
-      if (novo) { novo.focus(); novo.setSelectionRange(pos, pos); }
-    });
-  }
-};
+  </div>
+  ${AT.subnav("")}
+  <div class="panel"><div class="empty-note">
+    Não há mais uma lista geral de pacientes.<br>
+    Os pacientes ficam em <strong>Minha área → Pacientes</strong>, dentro da área
+    de cada profissional.<br><br>
+    <a href="#/atendimentos/minha-area">Ir para Minha área</a>
+  </div></div>`;
 
 Views.pacienteDetalhe = id => {
   const p = Store.get("pacientes", id);
@@ -389,11 +339,12 @@ Actions.novoPaciente = () => abrirFormPaciente({
 Actions.editarPaciente = id => abrirFormPaciente(Store.get("pacientes", id));
 Actions.verPaciente = id => { location.hash = "#/paciente/" + id; };
 
-/* de onde a ficha veio: da área do profissional ou do cadastro geral */
+/* de onde a ficha veio: da área do profissional ou de um link da agenda
+   e dos relatórios, que é por onde a administração chega a um paciente */
 function rotaListaPacientes() {
   return (typeof profLogado === "function" && profLogado())
     ? "#/atendimentos/meus-pacientes"
-    : "#/atendimentos/pacientes";
+    : "#/atendimentos";
 }
 Actions.voltarPacientes = () => { location.hash = rotaListaPacientes(); };
 Actions.excluirPaciente = id => {
