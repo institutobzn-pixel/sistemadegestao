@@ -1,5 +1,5 @@
-/* Agenda geral do instituto: datas de cursos e eventos, com salas.
-   Seletor de ano a partir de 2025 — os anos futuros surgem sozinhos. */
+/* Agenda geral do instituto: eventos com local, data, horário e palestrante.
+   A lista mostra todos os eventos agendados, agrupados por mês. */
 "use strict";
 
 const TIPOS_EVENTO = [
@@ -14,86 +14,71 @@ const TIPOS_EVENTO = [
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-let filtroEventos = { ano: new Date().getFullYear(), mes: 0, sala: "", tipo: "" }; // mes 0 = todos
-
 function tipoEventoChip(tipo) {
   const t = TIPOS_EVENTO.find(x => x[0] === tipo) || TIPOS_EVENTO[5];
   return `<span class="chip cor-${t[2]}">${t[1]}</span>`;
 }
 
+/* todos os eventos, do mais antigo ao mais recente */
+function eventosOrdenados() {
+  return Store.col("eventos")
+    .filter(e => e.data)
+    .sort((x, y) => (x.data + (x.horaInicio || "")).localeCompare(y.data + (y.horaInicio || "")));
+}
+
 Views.agenda = () => {
-  const anos = Store.anosAgenda();
-  if (!anos.includes(filtroEventos.ano)) filtroEventos.ano = anos.includes(new Date().getFullYear()) ? new Date().getFullYear() : anos[0];
+  const eventos = eventosOrdenados();
 
-  let eventos = Store.eventosDoAno(filtroEventos.ano);
-  if (filtroEventos.mes) eventos = eventos.filter(e => Number(e.data.slice(5, 7)) === filtroEventos.mes);
-  if (filtroEventos.sala) eventos = eventos.filter(e => e.sala === filtroEventos.sala);
-  if (filtroEventos.tipo) eventos = eventos.filter(e => e.tipo === filtroEventos.tipo);
-
-  /* agrupa por mês */
+  /* agrupa por mês/ano */
   let corpo = "";
-  let mesAtual = -1;
+  let grupoAtual = "";
   for (const e of eventos) {
+    const ano = e.data.slice(0, 4);
     const mes = Number(e.data.slice(5, 7)) - 1;
-    if (mes !== mesAtual) {
-      mesAtual = mes;
-      corpo += `<div class="alpha-letter">${MESES[mes]} de ${filtroEventos.ano}</div>`;
+    const grupo = `${MESES[mes]} de ${ano}`;
+    if (grupo !== grupoAtual) {
+      grupoAtual = grupo;
+      corpo += `<div class="alpha-letter">${grupo}</div>`;
     }
+
     const t = e.turmaId ? Store.get("turmas", e.turmaId) : null;
     const c = t ? Store.get("cursos", t.cursoId) : null;
-    const hora = e.horaInicio ? e.horaInicio + (e.horaFim ? "–" + e.horaFim : "") : "";
+    const hora = e.horaInicio ? e.horaInicio + (e.horaFim ? "–" + e.horaFim : "") : "dia todo";
+    const dia = e.data.slice(8, 10);
+    const mesCurto = MESES[mes].slice(0, 3);
+
+    const detalhes = [];
+    if (e.responsavel) detalhes.push("Palestrante: " + U.esc(e.responsavel));
+    if (e.obs) detalhes.push(U.esc(e.obs));
+
     corpo += `
-      <div class="aluno-row" style="cursor:default;">
-        <div style="min-width:86px; text-align:center; flex-shrink:0;">
-          <div style="font-weight:800; font-size:1.05rem;">${U.fmtData(e.data).slice(0, 5)}</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${hora || "dia todo"}</div>
+      <div class="aluno-row" style="cursor:pointer;" data-action="editarEvento" data-id="${e.id}" title="Clique para editar">
+        <div style="min-width:92px; text-align:center; flex-shrink:0;">
+          <div style="font-weight:800; font-size:1.3rem; line-height:1.1;">${dia}</div>
+          <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted);">${mesCurto} ${ano}</div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">${hora}</div>
         </div>
         <div class="a-info">
           <div class="a-nome">${U.esc(e.titulo)}</div>
-          <div class="a-sub">
-            ${e.responsavel ? "Resp.: " + U.esc(e.responsavel) : ""}${e.responsavel && e.obs ? " · " : ""}${U.esc(e.obs || "")}
-          </div>
+          <div class="a-sub">${detalhes.join(" · ") || "Sem palestrante informado"}</div>
         </div>
         <div class="a-chips" style="align-items:center;">
+          ${e.sala
+            ? `<span class="pill info">${U.esc(e.sala)}</span>`
+            : `<span class="pill">sem local</span>`}
           ${tipoEventoChip(e.tipo)}
           ${c ? `<span class="chip cor-${c.corIndex}">${U.esc(c.nome)}</span>` : ""}
-          ${e.sala ? `<span class="pill info">${U.esc(e.sala)}</span>` : ""}
           <button class="icon-btn" data-action="editarEvento" data-id="${e.id}" title="Editar" aria-label="Editar evento">&#9998;</button>
           <button class="icon-btn" data-action="excluirEvento" data-id="${e.id}" title="Excluir" aria-label="Excluir evento">&#128465;</button>
         </div>
       </div>`;
   }
 
-  const selAno = `<select id="ag-ano" class="search-input" style="min-width:auto;">
-    ${anos.map(a => `<option value="${a}" ${a === filtroEventos.ano ? "selected" : ""}>${a}</option>`).join("")}
-  </select>`;
-  const selMes = `<select id="ag-mes" class="search-input" style="min-width:auto;">
-    <option value="0">Todos os meses</option>
-    ${MESES.map((m, i) => `<option value="${i + 1}" ${filtroEventos.mes === i + 1 ? "selected" : ""}>${m}</option>`).join("")}
-  </select>`;
-  const selSala = `<select id="ag-sala" class="search-input" style="min-width:auto;">
-    <option value="">Todas as salas</option>
-    ${Store.config.salas.map(s => `<option value="${U.esc(s)}" ${filtroEventos.sala === s ? "selected" : ""}>${U.esc(s)}</option>`).join("")}
-  </select>`;
-  const selTipo = `<select id="ag-tipo" class="search-input" style="min-width:auto;">
-    <option value="">Todos os tipos</option>
-    ${TIPOS_EVENTO.map(([v, r]) => `<option value="${v}" ${filtroEventos.tipo === v ? "selected" : ""}>${r}</option>`).join("")}
-  </select>`;
-
-  /* resumo de uso das salas no ano */
-  const usoSalas = new Map();
-  Store.eventosDoAno(filtroEventos.ano).forEach(e => {
-    if (e.sala) usoSalas.set(e.sala, (usoSalas.get(e.sala) || 0) + 1);
-  });
-  const usoHTML = usoSalas.size ? [...usoSalas.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([sala, qtd]) => `<span class="chip">${U.esc(sala)} · ${qtd}</span>`).join(" ") : "";
-
   return `
     <div class="page-head">
       <div>
         <h2>Agenda</h2>
-        <p>Datas de cursos, workshops, palestras e eventos do instituto, com a sala de cada atividade.</p>
+        <p>Eventos do instituto: local, data, horário e palestrante. Clique em um evento para editar.</p>
       </div>
       <div class="head-actions">
         <button class="btn ghost" data-action="csvAgenda">Exportar planilha</button>
@@ -103,21 +88,13 @@ Views.agenda = () => {
     </div>
 
     <div class="panel">
-      <div class="head-actions">${selAno}${selMes}${selSala}${selTipo}</div>
-      ${usoHTML ? `<div style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-        <span style="font-size:0.76rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Uso das salas em ${filtroEventos.ano}:</span>
-        ${usoHTML}
-      </div>` : ""}
-    </div>
-
-    <div class="panel">
-      ${eventos.length ? corpo : `<div class="empty-note">Nenhum evento em ${filtroEventos.ano}${filtroEventos.sala || filtroEventos.tipo ? " com esses filtros" : ""}.<br>Use <strong>+ Novo evento</strong> para agendar.</div>`}
+      ${eventos.length ? corpo : `<div class="empty-note">Nenhum evento agendado ainda.<br>Use <strong>+ Novo evento</strong> para criar o primeiro.</div>`}
     </div>
   `;
 };
 
 function abrirFormEvento(e) {
-  const optSalas = ['<option value="">— sem sala definida —</option>']
+  const optSalas = ['<option value="">— sem local definido —</option>']
     .concat(Store.config.salas.map(s => `<option value="${U.esc(s)}" ${e.sala === s ? "selected" : ""}>${U.esc(s)}</option>`)).join("");
   const optTipos = TIPOS_EVENTO.map(([v, r]) => `<option value="${v}" ${e.tipo === v ? "selected" : ""}>${r}</option>`).join("");
   const optTurmas = ['<option value="">— sem vínculo com turma —</option>']
@@ -138,10 +115,10 @@ function abrirFormEvento(e) {
           <select id="fe-tipo" name="tipo">${optTipos}</select>
         </div>
         <div class="field">
-          <label for="fe-sala">Sala / local</label>
+          <label for="fe-sala">Espaço / local</label>
           <div style="display:flex; gap:6px;">
             <select id="fe-sala" name="sala" style="flex:1;">${optSalas}</select>
-            <button type="button" class="btn ghost sm" data-modal-action="novaSala" title="Adicionar sala">+</button>
+            <button type="button" class="btn ghost sm" data-modal-action="novaSala" title="Adicionar espaço">+</button>
           </div>
         </div>
         <div class="field">
@@ -156,9 +133,9 @@ function abrirFormEvento(e) {
           <label for="fe-fim">Hora de término</label>
           <input id="fe-fim" name="horaFim" type="time" value="${U.esc(e.horaFim)}">
         </div>
-        <div class="field">
-          <label for="fe-resp">Responsável</label>
-          <input id="fe-resp" name="responsavel" value="${U.esc(e.responsavel)}">
+        <div class="field full">
+          <label for="fe-resp">Palestrante / responsável</label>
+          <input id="fe-resp" name="responsavel" placeholder="quem conduz a atividade" value="${U.esc(e.responsavel)}">
         </div>
         <div class="field full">
           <label for="fe-turma">Turma vinculada (opcional)</label>
@@ -183,7 +160,6 @@ function abrirFormEvento(e) {
       return false;
     }
     Store.upsert("eventos", novo);
-    filtroEventos.ano = Number(dados.data.slice(0, 4));
     U.toast("Evento salvo.");
     App.render();
   });
@@ -203,7 +179,7 @@ Actions.excluirEvento = id => {
   }
 };
 Actions.novaSala = () => {
-  const nome = prompt("Nova sala/local (ex.: Sala 6, Cozinha comunitária):");
+  const nome = prompt("Novo espaço/local (ex.: Sala 6, Cozinha comunitária):");
   if (!nome) return;
   const salvo = Store.addSala(nome);
   const sel = document.getElementById("fe-sala");
@@ -211,37 +187,18 @@ Actions.novaSala = () => {
     sel.insertAdjacentHTML("beforeend", `<option value="${U.esc(salvo)}">${U.esc(salvo)}</option>`);
     sel.value = salvo;
   }
-  U.toast("Sala adicionada.");
+  U.toast("Espaço adicionado.");
 };
 
 Actions.csvAgenda = () => {
-  const cab = ["Data", "Início", "Término", "Título", "Tipo", "Sala", "Turma vinculada", "Responsável", "Observações"];
-  const linhas = Store.eventosDoAno(filtroEventos.ano).map(e => {
+  const cab = ["Data", "Início", "Término", "Título", "Tipo", "Espaço", "Turma vinculada", "Palestrante", "Observações"];
+  const linhas = eventosOrdenados().map(e => {
     const t = e.turmaId ? Store.get("turmas", e.turmaId) : null;
     const c = t ? Store.get("cursos", t.cursoId) : null;
     const rotulo = (TIPOS_EVENTO.find(x => x[0] === e.tipo) || ["", "Outro"])[1];
     return U.linhaCSV([U.fmtData(e.data), e.horaInicio, e.horaFim, e.titulo, rotulo, e.sala,
       c ? c.nome + " — " + t.nome : "", e.responsavel, e.obs]);
   });
-  U.baixarArquivo(`agenda-${filtroEventos.ano}-instituto-bzn.csv`, "﻿" + [U.linhaCSV(cab), ...linhas].join("\n"), "text/csv;charset=utf-8");
-  U.toast(`Agenda de ${filtroEventos.ano} exportada.`);
-};
-
-/* filtros */
-const aposRenderAgenda = Views.aposRender;
-Views.aposRender = (rota, param) => {
-  if (aposRenderAgenda) aposRenderAgenda(rota, param);
-  if (rota !== "agenda") return;
-  const liga = (id, campo) => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener("change", () => {
-      filtroEventos[campo] = campo === "ano" ? Number(el.value) : el.value;
-      App.render();
-    });
-  };
-  liga("ag-ano", "ano");
-  const selM = document.getElementById("ag-mes");
-  if (selM) selM.addEventListener("change", () => { filtroEventos.mes = Number(selM.value); App.render(); });
-  liga("ag-sala", "sala");
-  liga("ag-tipo", "tipo");
+  U.baixarArquivo("agenda-instituto-bzn.csv", "﻿" + [U.linhaCSV(cab), ...linhas].join("\n"), "text/csv;charset=utf-8");
+  U.toast("Agenda exportada.");
 };
