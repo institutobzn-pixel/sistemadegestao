@@ -125,7 +125,7 @@ function viewAgenda() {
 
 function abrirFormAtend(a) {
   const pacs = U.ordenarPorNome(Store.col("pacientes"));
-  if (!pacs.length) { U.toast("Cadastre um paciente primeiro (aba Pacientes)."); return; }
+  if (!pacs.length) { U.toast("Cadastre um paciente primeiro, em Minha área → Pacientes."); return; }
   const profs = U.ordenarPorNome(Store.col("profsaude"));
 
   const optPac = pacs.map(p => `<option value="${p.id}" ${a.pacienteId === p.id ? "selected" : ""}>${U.esc(p.nome)}</option>`).join("");
@@ -565,6 +565,7 @@ function viewMinhaArea() {
     </div>
     ${AT.subnav("minha-area")}
     ${AT.abasMinhaArea("minha-area")}
+    ${avisoAdminNaArea(prof)}
 
     <section class="stat-strip">
       <div class="stat-card" style="--stat-color: var(--p${AT.espCorIndex(prof.especialidade)})">
@@ -603,6 +604,18 @@ function viewMinhaArea() {
         : `<div class="empty-note">Nenhum registro ainda.</div>`}
     </div>
   `;
+}
+
+/* Deixa visível que quem está na área não é o profissional, e sim a
+   administração — para não parecer que a separação por profissional falhou. */
+function avisoAdminNaArea(prof) {
+  if (!App.ehAdmin()) return "";
+  return `
+    <div class="alert-box warn" style="margin-bottom:14px;">
+      <span class="ico">&#9881;</span>
+      <div><p>Você está na área de <strong>${U.esc(prof.nome)}</strong> como administração,
+      sem o PIN. ${U.esc(prof.nome.split(" ")[0])} vê exatamente estas mesmas telas.</p></div>
+    </div>`;
 }
 
 /* Pacientes de um profissional: os que já têm atendimento com ele e os que
@@ -662,6 +675,7 @@ function viewMeusPacientes() {
     </div>
     ${AT.subnav("minha-area")}
     ${AT.abasMinhaArea("meus-pacientes")}
+    ${avisoAdminNaArea(prof)}
 
     <div class="panel">
       ${pacientes.length ? linhas
@@ -680,6 +694,27 @@ function viewLoginProf() {
       </div>
     </div>
     ${AT.subnav("minha-area")}
+
+    ${App.ehAdmin() && profs.length ? `
+    <div class="panel" style="max-width:480px;">
+      <h3>&#9881; Acesso da administração</h3>
+      <p class="panel-sub">Abrir a área de um profissional sem o PIN dele</p>
+      <div class="form-grid" style="grid-template-columns:1fr;">
+        <div class="field">
+          <label for="admin-prof">Área a abrir</label>
+          <select id="admin-prof">
+            ${profs.map(p => `<option value="${p.id}">${U.esc(p.nome + " — " + p.especialidade)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn accent" data-action="entrarProfAdmin">Abrir área</button>
+      </div>
+      <div class="alert-box warn" style="margin-top:14px;">
+        <span class="ico">&#9888;&#65039;</span>
+        <div><p>Você verá os pacientes e a agenda desse profissional, incluindo dados pessoais e sociais. Use apenas quando a administração precisar — e saia da área ao terminar.</p></div>
+      </div>
+    </div>` : ""}
 
     <div class="panel" style="max-width:480px;">
       <h3>Entrar</h3>
@@ -728,6 +763,18 @@ Actions.entrarProf = () => {
   }
   sessionStorage.setItem(CHAVE_PROF_LOGADO, p.id);
   U.toast(`Bem-vindo(a), ${p.nome.split(" ")[0]}!`);
+  App.render();
+};
+
+/* A administração abre a área de um profissional sem o PIN dele. É uma
+   exceção deliberada, sinalizada na tela enquanto durar. */
+Actions.entrarProfAdmin = () => {
+  if (!App.ehAdmin()) return;
+  const id = document.getElementById("admin-prof").value;
+  const p = Store.get("profsaude", id);
+  if (!p) return;
+  sessionStorage.setItem(CHAVE_PROF_LOGADO, p.id);
+  U.toast(`Área de ${p.nome.split(" ")[0]} aberta pela administração.`);
   App.render();
 };
 
