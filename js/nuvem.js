@@ -11,10 +11,19 @@
 const Nuvem = (() => {
   const K_URL = "bzn-nuvem-url";
   const K_KEY = "bzn-nuvem-key";
+  const K_OFF = "bzn-nuvem-off";   // marca de "desconectei este aparelho de propósito"
   const INTERVALO = 7000; // verifica a nuvem a cada 7s
 
-  let url = localStorage.getItem(K_URL) || "";
-  let key = localStorage.getItem(K_KEY) || "";
+  /* Projeto do Instituto embutido: qualquer computador já abre conectado, sem
+     ninguém precisar digitar endereço nem chave. A chave publicável pode ficar
+     aqui à vista — sozinha ela não lê nem escreve nada, porque a regra da
+     tabela exige uma sessão autenticada (e-mail e senha). */
+  const URL_PADRAO = "https://pyiqjmweldihsfheqgli.supabase.co";
+  const KEY_PADRAO = "sb_publishable_ZJman0R-WkiuT-wJk8RYfA_e1dfklvz";
+
+  const desligado = localStorage.getItem(K_OFF) === "1";
+  let url = localStorage.getItem(K_URL) || (desligado ? "" : URL_PADRAO);
+  let key = localStorage.getItem(K_KEY) || (desligado ? "" : KEY_PADRAO);
   let timerPoll = null;
   let timerEnvio = null;
   let ultimoRemoto = "";   // "atualizado_em" já conhecido (evita reaplicar)
@@ -33,12 +42,16 @@ const Nuvem = (() => {
     key = String(k || "").trim();
     localStorage.setItem(K_URL, url);
     localStorage.setItem(K_KEY, key);
+    localStorage.removeItem(K_OFF);
   }
 
   function limparConfig() {
     url = ""; key = "";
     localStorage.removeItem(K_URL);
     localStorage.removeItem(K_KEY);
+    /* sem esta marca o aparelho voltaria a usar a configuração embutida
+       no próximo recarregamento, e o "Desconectar" não valeria de nada */
+    localStorage.setItem(K_OFF, "1");
     pararPolling();
     ligado = false;
   }
@@ -227,7 +240,12 @@ const Nuvem = (() => {
     try {
       const linha = await baixar();
       if (linha === null) {
-        return { ok: false, msg: "Conectou, mas a linha inicial não existe. Rode o código do passo 3 do guia." };
+        /* a nuvem respondeu, mas devolveu vazio. Quase sempre é a regra de
+           acesso fazendo o seu trabalho: sem login, não se vê nada. */
+        const temConta = (typeof Auth !== "undefined") && Auth.logado();
+        return { ok: false, msg: temConta
+          ? "Conectou, mas a linha inicial não existe. Rode o código do passo 3 do guia."
+          : "Conectou à nuvem, mas os dados só aparecem depois que você entrar com seu e-mail e senha." };
       }
       return { ok: true, msg: "Conexão OK! A nuvem respondeu corretamente." };
     } catch (e) {
