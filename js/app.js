@@ -96,7 +96,16 @@ const App = (() => {
       ((rota === "indicadores" || rota === "graficos" || rota === "relatorios") && asLogado);
     const btnSair = document.getElementById("btn-sair-sistema");
     if (!nivel() && !rotaLivre) {
+      /* a tela de entrada é montada e a função retorna aqui, antes dos
+         botões abaixo — então eles precisam ser escondidos neste ponto,
+         senão continuam visíveis da sessão anterior */
       if (btnSair) btnSair.hidden = true;
+      const btnSegPortao = document.getElementById("btn-seguranca");
+      if (btnSegPortao) btnSegPortao.hidden = true;
+      const btnContaPortao = document.getElementById("btn-minha-conta");
+      if (btnContaPortao) btnContaPortao.hidden = true;
+      const navLoginsPortao = document.getElementById("nav-logins");
+      if (navLoginsPortao) navLoginsPortao.hidden = true;
       renderPortao();
       return;
     }
