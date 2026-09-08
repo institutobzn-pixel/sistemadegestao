@@ -388,6 +388,8 @@ tbody tr.clickable:hover td { background: var(--surface-2); }
 .alert-box.warn .ico { color: var(--warn); }
 .alert-box.ok .ico { color: var(--good); }
 .alert-box strong { display: block; font-size: 0.86rem; margin-bottom: 2px; }
+/* negrito no meio de um parágrafo é ênfase, não título: não quebra linha */
+.alert-box p strong { display: inline; font-size: inherit; margin-bottom: 0; }
 .alert-box p { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 
 /* ---------- donut ---------- */
