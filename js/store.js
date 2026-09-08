@@ -160,7 +160,9 @@ const Store = (() => {
       nome: String(c.nome || "").trim(),
       papel: c.papel || "secretaria",
       profsaudeId: c.profsaudeId || "",
-      professorId: c.professorId || ""
+      professorId: c.professorId || "",
+      /* checkbox do formulário chega como "on"; ausente quando desmarcado */
+      senhaProvisoria: c.senhaProvisoria === true || c.senhaProvisoria === "on"
     };
     if (i >= 0) lista[i] = registro; else lista.push(registro);
     salvar();

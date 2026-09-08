@@ -104,6 +104,9 @@ const App = (() => {
       btnSair.hidden = !nivel();
       btnSair.textContent = nivel() ? "Sair (" + ({ admin: "admin", presidente: "presidente", secretaria: "secretaria" }[nivel()] || "") + ")" : "Sair";
     }
+    const btnConta = document.getElementById("btn-minha-conta");
+    if (btnConta) btnConta.hidden = !(typeof Auth !== "undefined" && Auth.logado());
+
     const btnSeg = document.getElementById("btn-seguranca");
     if (btnSeg) btnSeg.hidden = !ehAdmin();
 
@@ -340,6 +343,9 @@ const App = (() => {
       U.toast(`Bem-vindo(a)${conta.nome ? ", " + conta.nome.split(" ")[0] : ""}!`);
       const destino = telaInicialDaConta(conta);
       if (location.hash === destino) render(); else location.hash = destino;
+      if (conta.senhaProvisoria) {
+        setTimeout(() => Actions.trocarMinhaSenha(null, "obrigatoria"), 300);
+      }
     };
 
     const btnConta = document.getElementById("conta-entrar");
@@ -442,10 +448,13 @@ const App = (() => {
     backdrop.hidden = false;
     const form = modalBody.querySelector("form");
     if (form && aoEnviar) {
-      form.addEventListener("submit", ev => {
+      form.addEventListener("submit", async ev => {
         ev.preventDefault();
         const dados = Object.fromEntries(new FormData(form).entries());
-        if (aoEnviar(dados, form) !== false) fecharModal();
+        /* await deixa o retorno de um callback assíncrono chegar de verdade:
+           sem ele, a Promise nunca é `false` e o modal fechava antes de validar */
+        const r = await aoEnviar(dados, form);
+        if (r !== false) fecharModal();
       });
     }
     modalBody.querySelectorAll("[data-modal-action]").forEach(el => {
@@ -471,6 +480,52 @@ const App = (() => {
   document.getElementById("menu-btn").addEventListener("click", () => {
     document.getElementById("nav-tabs").classList.toggle("open");
   });
+
+  /* Troca da própria senha — de quem entrou por conta, para si mesmo.
+     Diferente de ⚙ Logins, que é o administrador mexendo nos perfis. */
+  Actions.trocarMinhaSenha = (_id, opcoes) => {
+    const obrigatoria = opcoes === "obrigatoria";
+    abrirModal(obrigatoria ? "Crie sua senha" : "Trocar minha senha", `
+      <form>
+        ${obrigatoria ? `<p style="font-size:0.9rem; margin:0 0 12px;">
+          Você entrou com a senha provisória que a administração forneceu.
+          Crie agora uma senha só sua — ninguém mais vai conhecê-la.</p>` : ""}
+        <p class="panel-sub" style="margin:0 0 12px;">Conta: <strong>${U.esc(Auth.email())}</strong></p>
+        <div class="form-grid" style="grid-template-columns:1fr;">
+          <div class="field">
+            <label for="ms-nova">Nova senha (mínimo 6 caracteres)</label>
+            <input id="ms-nova" name="nova" type="password" autocomplete="new-password" required minlength="6">
+          </div>
+          <div class="field">
+            <label for="ms-conf">Confirme a nova senha</label>
+            <input id="ms-conf" name="conf" type="password" autocomplete="new-password" required minlength="6">
+          </div>
+        </div>
+        <p id="ms-aviso" style="color:var(--danger); font-size:0.85rem; min-height:1.2em; margin:8px 0 0;"></p>
+        <div class="form-actions">
+          ${obrigatoria ? "" : `<button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>`}
+          <button type="submit" class="btn accent">Salvar senha</button>
+        </div>
+      </form>`, async dados => {
+      const aviso = document.getElementById("ms-aviso");
+      const mostrar = m => { if (aviso) aviso.textContent = m; };
+      if (dados.nova.length < 6) { mostrar("Use pelo menos 6 caracteres."); return false; }
+      if (dados.nova !== dados.conf) { mostrar("As senhas não conferem."); return false; }
+      mostrar("Salvando…");
+      const r = await Auth.trocarSenha(dados.nova);
+      if (!r.ok) { mostrar(r.msg); return false; }
+      /* deixa de ser provisória */
+      const conta = Store.contaPorEmail(Auth.email());
+      if (conta && conta.senhaProvisoria) {
+        Store.salvarConta(Object.assign({}, conta, { senhaProvisoria: false }));
+      }
+      U.toast("Senha alterada.");
+      return true; // abrirModal fecha ao receber algo diferente de false
+    });
+  };
+
+  const btnMinhaConta = document.getElementById("btn-minha-conta");
+  if (btnMinhaConta) btnMinhaConta.addEventListener("click", () => Actions.trocarMinhaSenha());
 
   const btnSeguranca = document.getElementById("btn-seguranca");
   if (btnSeguranca) btnSeguranca.addEventListener("click", () => { location.hash = "#/seguranca"; });

@@ -230,6 +230,7 @@ function painelContas() {
       <td>${U.esc(c.email)}</td>
       <td>${U.esc(c.nome || "—")}</td>
       <td>${U.esc(rotuloPapel(c.papel))}${vinculo ? " · " + vinculo : ""}</td>
+      <td>${c.senhaProvisoria ? `<span class="pill warn">provisória</span>` : `<span class="pill ok">própria</span>`}</td>
       <td style="white-space:nowrap">
         <button class="icon-btn" data-action="editarConta" data-id="${U.esc(c.email)}" title="Editar" aria-label="Editar conta">&#9998;</button>
         <button class="icon-btn" data-action="removerConta" data-id="${U.esc(c.email)}" title="Remover" aria-label="Remover conta">&#128465;</button>
@@ -250,7 +251,7 @@ function painelContas() {
         <div><p>A nuvem ainda não está conectada neste aparelho. As contas só funcionam com a nuvem configurada.</p></div>
       </div>`}
       ${lista.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>E-mail</th><th>Nome</th><th>Perfil</th><th></th></tr></thead>
+        <thead><tr><th>E-mail</th><th>Nome</th><th>Perfil</th><th>Senha</th><th></th></tr></thead>
         <tbody>${linhas}</tbody>
       </table></div>` : `<div class="empty-note">Nenhuma conta cadastrada ainda.</div>`}
       <div class="head-actions" style="margin-top:12px;">
@@ -299,6 +300,12 @@ function abrirFormConta(c) {
           <label for="fc-pr">Qual professor(a)</label>
           <select id="fc-pr" name="professorId">${optPR}</select>
         </div>
+        <div class="field full">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" name="senhaProvisoria" ${c.senhaProvisoria !== false ? "checked" : ""}>
+            <span>Senha provisória — pedir que a pessoa crie a dela no primeiro acesso</span>
+          </label>
+        </div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
@@ -329,7 +336,7 @@ function abrirFormConta(c) {
   ajustar();
 }
 
-Actions.novaConta = () => abrirFormConta({ email: "", nome: "", papel: "secretaria", profsaudeId: "", professorId: "" });
+Actions.novaConta = () => abrirFormConta({ email: "", nome: "", papel: "secretaria", profsaudeId: "", professorId: "", senhaProvisoria: true });
 Actions.editarConta = email => {
   const c = Store.contaPorEmail(email);
   if (c) abrirFormConta(c);

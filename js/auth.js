@@ -108,6 +108,38 @@ const Auth = (() => {
     return (sessao && sessao.access_token) || "";
   }
 
+  /* Troca a senha da própria conta. Usado no primeiro acesso, quando o
+     administrador entregou uma senha provisória, e sempre que a pessoa
+     quiser — sem passar por ninguém. */
+  async function trocarSenha(nova) {
+    const url = base();
+    if (!url) return { ok: false, msg: "A nuvem não está configurada neste aparelho." };
+    const t = await token();
+    if (!t) return { ok: false, msg: "Sua sessão expirou. Entre de novo." };
+    let r, dados;
+    try {
+      r = await fetch(`${url}/auth/v1/user`, {
+        method: "PUT",
+        headers: { "apikey": chave(), "Authorization": "Bearer " + t, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: String(nova) })
+      });
+      dados = await r.json().catch(() => ({}));
+    } catch (e) {
+      return { ok: false, msg: "Sem conexão com a nuvem." };
+    }
+    if (!r.ok) {
+      const msg = (dados && (dados.msg || dados.message || dados.error_description)) || "";
+      if (/at least|weak|short|6 characters/i.test(msg)) {
+        return { ok: false, msg: "A senha é curta demais. Use pelo menos 6 caracteres." };
+      }
+      if (/same.*password|should be different/i.test(msg)) {
+        return { ok: false, msg: "A nova senha precisa ser diferente da atual." };
+      }
+      return { ok: false, msg: msg || `Não foi possível trocar a senha (${r.status}).` };
+    }
+    return { ok: true };
+  }
+
   function sair() {
     const url = base();
     const t = tokenAtual();
@@ -121,5 +153,5 @@ const Auth = (() => {
     }
   }
 
-  return { entrar, sair, renovar, token, tokenAtual, logado, email };
+  return { entrar, sair, renovar, token, tokenAtual, logado, email, trocarSenha };
 })();
