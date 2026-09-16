@@ -214,6 +214,11 @@ const App = (() => {
     }
 
     const comNuvem = typeof Nuvem !== "undefined" && Nuvem.configurada();
+    /* Com contas de e-mail em uso, o acesso antigo (perfil+senha e os PINs por
+       área) vira alternativa de emergência: fica recolhido para não competir
+       com o login de verdade. Quem chegava nesta tela via duas portas lado a
+       lado e escolhia a errada. */
+    const legado = comNuvem && !primeiraVez;
 
     view.innerHTML = `
       ${comNuvem ? `
@@ -236,7 +241,9 @@ const App = (() => {
         <p id="conta-aviso" class="panel-sub" style="color:var(--danger); min-height:1.2em;"></p>
       </div>` : ""}
 
-      <div class="panel" style="max-width:440px; margin:${comNuvem ? "18px" : "40px"} auto 0;">
+      ${legado ? `<details class="entrada-antiga">
+        <summary>Não tenho conta de e-mail — usar o acesso antigo</summary>` : ""}
+      <div class="panel" style="max-width:440px; margin:${legado ? "10px" : (comNuvem ? "18px" : "40px")} auto 0;">
         <h3 style="margin-bottom:2px;">${primeiraVez ? "Primeiro acesso neste aparelho" : "Acesso restrito"}</h3>
         <p class="panel-sub">${primeiraVez
           ? "Se o instituto <strong>já usa</strong> o sistema, clique em <strong>“☁️ Trazer os dados”</strong> abaixo — <strong>não crie senha nova</strong>. Crie a senha só se for a primeiríssima vez do instituto."
@@ -285,7 +292,8 @@ const App = (() => {
           <a href="#" id="portao-nuvem">&#9729;&#65039; Já usamos a nuvem — trazer os dados deste instituto</a>
           ${primeiraVez ? "" : `<a href="#" id="portao-esqueci" style="color:var(--text-muted);">Esqueci a senha do administrador</a>`}
         </div>
-      </div>`;
+      </div>
+      ${legado ? "</details>" : ""}`;
 
     const senha = document.getElementById("portao-senha");
     const aviso = msg => {

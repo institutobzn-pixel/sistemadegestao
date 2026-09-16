@@ -566,3 +566,21 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
   a { text-decoration: none; color: inherit; }
   @page { margin: 1.4cm; }
 }
+
+/* Entrada antiga (perfil + senha e os PINs por área) recolhida na tela de
+   login: continua disponível para emergência, mas sem disputar atenção com o
+   acesso por conta, que é o caminho de todo mundo. */
+.entrada-antiga {
+  max-width: 440px;
+  margin: 18px auto 0;
+}
+.entrada-antiga > summary {
+  cursor: pointer;
+  list-style: none;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 8px;
+}
+.entrada-antiga > summary::-webkit-details-marker { display: none; }
+.entrada-antiga > summary:hover { color: var(--text); text-decoration: underline; }
