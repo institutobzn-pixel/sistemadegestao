@@ -66,8 +66,21 @@ const App = (() => {
      gestão, mas não ao dado clínico individual. */
   const podeClinica = () => nivel() === "admin";
 
+  /* Quais abas do topo fazem sentido para quem está logado. Quem entra por uma
+     conta de área só alcança a própria: antes via a barra inteira e, ao clicar
+     em qualquer outra, voltava para a tela de entrada — parecia defeito, não
+     permissão. Devolve null quando não há o que esconder. */
+  function abasVisiveis() {
+    if (nivel()) return null;   // administração, presidência e secretaria navegam tudo
+    if (sessionStorage.getItem("bzn-prof-logado")) return ["atendimentos"];
+    if (sessionStorage.getItem("bzn-as-logado") === "1") return ["assistencia", "indicadores"];
+    if (sessionStorage.getItem("bzn-fin-logado") === "1") return ["financeiro"];
+    /* professor: a área dele é inteira em si mesma, nenhuma aba do topo abre */
+    return [];
+  }
+
   /* permissões por nível: admin, presidente e secretaria têm acesso completo
-     à operação (só admin/presidente gerenciam senhas/PINs). */
+     à operação (só admin/presidente gerenciam senhas). */
   function rotaPermitida() {
     const n = nivel();
     return n === "admin" || n === "presidente" || n === "secretaria";
@@ -125,8 +138,10 @@ const App = (() => {
     const navSair = document.getElementById("nav-sair");
     if (navSair) navSair.hidden = !nivel();
 
+    const visiveis = abasVisiveis();
     document.querySelectorAll("#nav-tabs a").forEach(a => {
       const r = a.dataset.route;
+      if (r) a.hidden = visiveis !== null && !visiveis.includes(r);
       a.classList.toggle("active",
         r === rota ||
         (rota === "aluno" && r === "alunos") ||
@@ -136,6 +151,11 @@ const App = (() => {
         ((rota === "graficos" || rota === "relatorios") && r === "indicadores"));
     });
     document.getElementById("nav-tabs").classList.remove("open");
+    /* sem nenhuma aba, o ☰ do celular abriria um menu vazio */
+    const btnMenu = document.getElementById("menu-btn");
+    if (btnMenu) {
+      btnMenu.hidden = !document.querySelector("#nav-tabs a:not([hidden])");
+    }
 
     const view = document.getElementById("view");
     view.innerHTML = fn(param) || "";
@@ -190,7 +210,14 @@ const App = (() => {
   let portaoTentouBaixar = false;
   let portaoNuvemFora = false;   // a nuvem está configurada, mas não respondeu
   function renderPortao() {
-    document.querySelectorAll("#nav-tabs a").forEach(a => a.classList.remove("active"));
+    /* na tela de entrada não há nada para navegar: as abas ficam escondidas
+       em vez de anunciar áreas que ninguém alcança sem entrar */
+    document.querySelectorAll("#nav-tabs a").forEach(a => {
+      a.classList.remove("active");
+      if (a.dataset.route) a.hidden = true;
+    });
+    const menuPortao = document.getElementById("menu-btn");
+    if (menuPortao) menuPortao.hidden = true;
     const view = document.getElementById("view");
     const primeiraVez = !Store.temSenha("admin");
     const nuvemCfg = (typeof Nuvem !== "undefined") && Nuvem.configurada();

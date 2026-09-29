@@ -369,7 +369,7 @@ Views.professorArea = () => {
           <h2>Área do professor</h2>
           <p>Acesso restrito: cada professor vê apenas as próprias turmas, alunos e chamadas.</p>
         </div>
-        <div class="head-actions"><a class="btn ghost" href="#/professores" style="text-decoration:none;">&larr; Voltar</a></div>
+        ${App.ehAdmin() ? `<div class="head-actions"><a class="btn ghost" href="#/professores" style="text-decoration:none;">&larr; Voltar</a></div>` : ""}
       </div>
       ${U.painelSoConta("Entrar na sua área", "Esta área é aberta pela sua conta")}
     `;
