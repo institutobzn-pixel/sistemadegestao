@@ -36,7 +36,7 @@ const Store = (() => {
                       //  tipo: arquivo|link, arquivo:{nome,dataUrl}, url}
     linksImagens: [], // {id, assunto, titulo, url, obs}
     professores: [],  // {id, nome, telefone, email, formacao, experiencia, nascimento, cpf, cnpj,
-                      //  endereco, bairro, cidade, cep, pix, dataInicio, arquivos:[{nome, dataUrl}], pinHash}
+                      //  endereco, bairro, cidade, cep, pix, dataInicio, arquivos:[{nome, dataUrl}]}
     equipe: [],       // funcionários e colaboradores — {id, nome, tipo: funcionario|colaborador, funcao,
                       //  telefone, email, nascimento, cpf, cnpj, endereco, bairro, cidade, cep,
                       //  pix, dataInicio, arquivos:[{nome, dataUrl}], observacoes}
@@ -199,15 +199,6 @@ const Store = (() => {
 
   /* ---------- assistência social ---------- */
 
-  function temPinAssistencia() { return !!db.config.pinAssistenciaHash; }
-  function definirPinAssistencia(pin) {
-    db.config.pinAssistenciaHash = U.hashPin(String(pin));
-    salvar();
-  }
-  function conferirPinAssistencia(pin) {
-    return temPinAssistencia() && U.hashPin(String(pin)) === db.config.pinAssistenciaHash;
-  }
-
   function addAreaEspera(nome) {
     const n = String(nome || "").trim();
     if (!n) return false;
@@ -233,16 +224,6 @@ const Store = (() => {
   }
 
   /* ---------- financeiro ---------- */
-
-  /* PIN do gestor financeiro (definido pelo admin) */
-  function temPinFinanceiro() { return !!db.config.pinFinanceiroHash; }
-  function definirPinFinanceiro(pin) {
-    db.config.pinFinanceiroHash = U.hashPin(String(pin));
-    salvar();
-  }
-  function conferirPinFinanceiro(pin) {
-    return temPinFinanceiro() && U.hashPin(String(pin)) === db.config.pinFinanceiroHash;
-  }
 
   function addCategoriaFin(nome) {
     const n = String(nome || "").trim();
@@ -873,11 +854,10 @@ const Store = (() => {
 
   /* ---------- dados de demonstração ---------- */
   function carregarDemo() {
-    const pinProfDemo = U.hashPin("1234"); // PIN dos professores de exemplo: 1234
     const profs = [
-      { nome: "Carlos Mendes", telefone: "(51) 99911-2233", email: "carlos@exemplo.com", formacao: "Administração", experiencia: "15 anos como consultor de negócios; ex-gestor do Sebrae regional.", pinHash: pinProfDemo, nascimento: "1978-07-15", dataInicio: "2024-08-01" },
-      { nome: "Fernanda Tavares", telefone: "(51) 99822-3344", email: "fernanda@exemplo.com", formacao: "Ciências Contábeis", experiencia: "Contadora, 9 anos de experiência com microempreendedores.", pinHash: pinProfDemo, nascimento: "1985-03-22", dataInicio: "2025-02-10" },
-      { nome: "Juliana Lopes", telefone: "(51) 99733-4455", email: "juliana@exemplo.com", formacao: "Publicidade e Propaganda", experiencia: "Estrategista digital, agência própria há 6 anos.", pinHash: pinProfDemo, nascimento: "1991-07-03", dataInicio: "2025-02-10" }
+      { nome: "Carlos Mendes", telefone: "(51) 99911-2233", email: "carlos@exemplo.com", formacao: "Administração", experiencia: "15 anos como consultor de negócios; ex-gestor do Sebrae regional.", nascimento: "1978-07-15", dataInicio: "2024-08-01" },
+      { nome: "Fernanda Tavares", telefone: "(51) 99822-3344", email: "fernanda@exemplo.com", formacao: "Ciências Contábeis", experiencia: "Contadora, 9 anos de experiência com microempreendedores.", nascimento: "1985-03-22", dataInicio: "2025-02-10" },
+      { nome: "Juliana Lopes", telefone: "(51) 99733-4455", email: "juliana@exemplo.com", formacao: "Publicidade e Propaganda", experiencia: "Estrategista digital, agência própria há 6 anos.", nascimento: "1991-07-03", dataInicio: "2025-02-10" }
     ].map(p => upsert("professores", p));
 
     const nomesAlunos = [
@@ -938,11 +918,10 @@ const Store = (() => {
     // pergunta de segurança de exemplo (troque pela sua na página Segurança)
     definirPerguntaSeguranca("Qual o nome do seu primeiro cachorro?", "Bolinha");
 
-    const pinDemo = U.hashPin("1234"); // PIN dos profissionais de exemplo: 1234
     const profSaude = [
-      { nome: "Dra. Helena Souza", especialidade: "Psicologia", crp: "07/12345", crm: "", registro: "", dias: "Seg, Qua e Sex", horarios: "13h–18h", telefone: "(51) 99611-2020", email: "helena@exemplo.com", pinHash: pinDemo },
-      { nome: "Dr. Marcos Antunes", especialidade: "Psiquiatria", crp: "", crm: "CRM-RS 45678", registro: "", dias: "Ter", horarios: "8h–12h", telefone: "(51) 99522-3030", email: "marcos@exemplo.com", pinHash: pinDemo },
-      { nome: "Renata Borges", especialidade: "Neuropsicopedagogia", crp: "", crm: "", registro: "ABPp 3321", dias: "Qui e Sex", horarios: "9h–15h", telefone: "(51) 99433-4040", email: "renata@exemplo.com", pinHash: pinDemo }
+      { nome: "Dra. Helena Souza", especialidade: "Psicologia", crp: "07/12345", crm: "", registro: "", dias: "Seg, Qua e Sex", horarios: "13h–18h", telefone: "(51) 99611-2020", email: "helena@exemplo.com" },
+      { nome: "Dr. Marcos Antunes", especialidade: "Psiquiatria", crp: "", crm: "CRM-RS 45678", registro: "", dias: "Ter", horarios: "8h–12h", telefone: "(51) 99522-3030", email: "marcos@exemplo.com" },
+      { nome: "Renata Borges", especialidade: "Neuropsicopedagogia", crp: "", crm: "", registro: "ABPp 3321", dias: "Qui e Sex", horarios: "9h–15h", telefone: "(51) 99433-4040", email: "renata@exemplo.com" }
     ].map(p => upsert("profsaude", p));
 
     const nomesPac = [
@@ -1040,9 +1019,7 @@ const Store = (() => {
     temSenha, definirSenha, removerSenha, conferirSenha,
     aniversariantes,
     temPerguntaSeguranca, perguntaSeguranca, definirPerguntaSeguranca, conferirResposta,
-    temPinAssistencia, definirPinAssistencia, conferirPinAssistencia,
     addAreaEspera, esperaPorArea,
-    temPinFinanceiro, definirPinFinanceiro, conferirPinFinanceiro,
     addCategoriaFin, importarLancamentos, resumoFin, anosFin,
     anosAgenda, eventosDoAno, conflitoSala,
     atendimentosDoPaciente, especialidadesDoPaciente, cruzamentoAtendimentos,

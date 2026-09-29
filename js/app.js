@@ -79,12 +79,12 @@ const App = (() => {
     const fn = rotas[rota] || rotas.dashboard;
 
     /* portão de entrada: sem login, só as áreas restritas de professor e
-       profissional de saúde (que têm PIN próprio) */
-    /* rotas com controle próprio: PIN de professor, de profissional e do financeiro */
+       profissional de saúde (que entram pela própria conta) */
+    /* rotas com controle próprio: professor, profissional de saúde e financeiro */
     const asLogado = sessionStorage.getItem("bzn-as-logado") === "1";
     const profSaudeLogado = !!sessionStorage.getItem("bzn-prof-logado");
     const rotaLivre = rota === "professor" ||
-      /* quem entrou por PIN de profissional resolve tudo dentro de
+      /* quem entrou como profissional de saúde resolve tudo dentro de
          Atendimentos: a própria área abre, o resto recusa com aviso claro
          em vez de jogá-lo no portão de senha da administração */
       (rota === "atendimentos" && (param === "minha-area" || param === "meus-pacientes" || profSaudeLogado)) ||
@@ -151,7 +151,7 @@ const App = (() => {
   }
 
   /* Traduz o papel da conta para a sessão que o app já entende. Mantém um
-     caminho só: quem entra por conta não digita senha de perfil nem PIN. */
+     caminho só: quem entra por conta não digita senha de perfil. */
   function aplicarPerfilDaConta(conta) {
     sessionStorage.removeItem("bzn-prof-logado");
     sessionStorage.removeItem("bzn-professor-logado");
@@ -310,10 +310,6 @@ const App = (() => {
         </div>
         ${primeiraVez ? "</details>" : ""}
         <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border); font-size:0.82rem; display:flex; flex-direction:column; gap:6px;">
-          <a href="#/professor">&#128274; Sou professor — entrar com meu PIN</a>
-          <a href="#/atendimentos/minha-area">&#128274; Sou profissional de saúde — entrar com meu PIN</a>
-          <a href="#/assistencia">&#128274; Sou da assistência social — entrar com meu PIN</a>
-          <a href="#/financeiro">&#128274; Sou gestor(a) financeiro(a) — entrar com meu PIN</a>
           <a href="#" id="portao-nuvem">&#9729;&#65039; Já usamos a nuvem — trazer os dados deste instituto</a>
           ${primeiraVez ? "" : `<a href="#" id="portao-esqueci" style="color:var(--text-muted);">Esqueci a senha do administrador</a>`}
         </div>

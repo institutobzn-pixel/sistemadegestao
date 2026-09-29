@@ -110,16 +110,13 @@ Views.relatorios = () => {
     ${App.ehAdmin() ? `
     <div class="panel">
       <h3>Segurança e logins</h3>
-      <p class="panel-sub">Somente o administrador cria e troca as senhas dos perfis. Os PINs de professores e profissionais são definidos nos respectivos cadastros.</p>
+      <p class="panel-sub">Cada pessoa entra com e-mail e senha próprios. Aqui você define qual perfil cada conta tem.</p>
       <div class="head-actions">
-        <button class="btn" data-action="senhaPerfil" data-id="admin">Trocar senha do admin</button>
-        <button class="btn" data-action="senhaPerfil" data-id="secretaria">${Store.temSenha("secretaria") ? "Trocar" : "Criar"} senha da secretaria</button>
-        <button class="btn" data-action="pinFinanceiro">${Store.temPinFinanceiro() ? "Trocar" : "Criar"} PIN do gestor financeiro</button>
+        <a class="btn accent" href="#/seguranca" style="text-decoration:none;">Abrir segurança e logins &rarr;</a>
       </div>
       <div class="combo-note" style="margin-top:14px;">
-        <strong>Admin</strong>: acesso total, inclusive gerenciar senhas e PINs ·
-        <strong>Secretaria</strong>: operação completa, sem gerenciar logins.
-        Professores e profissionais de saúde entram com PIN próprio, vendo apenas o que é deles.
+        O perfil da conta decide o que a pessoa alcança. <strong>Admin</strong> vê tudo;
+        os demais, apenas a própria área.
       </div>
     </div>` : ""}
   `;
@@ -473,7 +470,7 @@ Views.seguranca = () => {
   if (!App.ehAdmin()) {
     return `<div class="panel" style="max-width:440px; margin:40px auto 0;">
       <div class="empty-note">Somente o <strong>administrador</strong> ou a <strong>presidência</strong> acessam a área de segurança.<br>
-      Entre com o perfil Administração ou Presidência para gerenciar senhas e PINs.</div></div>`;
+      Entre com uma conta de administração ou presidência para gerenciar os acessos.</div></div>`;
   }
   const item = (titulo, descricao, botoes) => `
     <div class="panel">
@@ -485,7 +482,7 @@ Views.seguranca = () => {
     <div class="page-head">
       <div>
         <h2>&#9881; Segurança e logins</h2>
-        <p>Central do administrador: todas as senhas e PINs do sistema são criados e trocados aqui (e apenas por você).</p>
+        <p>Central do administrador: as contas de acesso e as senhas do sistema são criadas e trocadas aqui (e apenas por você).</p>
       </div>
     </div>
 
@@ -513,7 +510,7 @@ Views.seguranca = () => {
       `<button class="btn" data-action="senhaPerfil" data-id="admin">Trocar senha do admin</button>`)}
 
     ${item("Senha da presidência",
-      `Acesso total, igual ao administrador (todas as áreas, Financeiro e esta página de logins). ${Store.temSenha("presidente") ? "<strong>Status: criada ✓</strong>" : "<strong>Status: ainda não criada</strong>"}`,
+      `Acesso amplo, com uma exceção: na área clínica vê apenas os nomes dos pacientes, nunca os atendimentos. ${Store.temSenha("presidente") ? "<strong>Status: criada ✓</strong>" : "<strong>Status: ainda não criada</strong>"}`,
       `<button class="btn accent" data-action="senhaPerfil" data-id="presidente">${Store.temSenha("presidente") ? "Trocar" : "Criar"} senha da presidência</button>`)}
 
     ${item("Pergunta de segurança",
@@ -521,38 +518,23 @@ Views.seguranca = () => {
       `<button class="btn accent" data-action="perguntaSeguranca">${Store.temPerguntaSeguranca() ? "Trocar" : "Cadastrar"} pergunta de segurança</button>`)}
 
     ${item("Senha da secretaria",
-      `Compartilhada pela equipe da secretaria. Operação completa (cadastros, chamada, atendimentos, agenda, relatórios), sem gerenciar logins nem acessar o financeiro. ${Store.temSenha("secretaria") ? "<strong>Status: criada ✓</strong>" : "<strong>Status: ainda não criada</strong>"}`,
+      `Compartilhada pela equipe da secretaria. Cadastros, chamada e agenda; com limites no Financeiro, no Serviço Social e nos Atendimentos. ${Store.temSenha("secretaria") ? "<strong>Status: criada ✓</strong>" : "<strong>Status: ainda não criada</strong>"}`,
       `<button class="btn accent" data-action="senhaPerfil" data-id="secretaria">${Store.temSenha("secretaria") ? "Trocar" : "Criar"} senha da secretaria</button>`)}
-
-    ${item("PIN do gestor financeiro",
-      `Dá acesso exclusivo à aba Financeiro (extrato, Guru, notas fiscais e relatórios). ${Store.temPinFinanceiro() ? "<strong>Status: criado ✓</strong>" : "<strong>Status: ainda não criado</strong>"}`,
-      `<button class="btn accent" data-action="pinFinanceiro">${Store.temPinFinanceiro() ? "Trocar" : "Criar"} PIN do gestor financeiro</button>`)}
-
-    ${item("PIN da assistência social",
-      `Dá acesso exclusivo à aba Assistência (atendidos, lista de espera, agenda interna e legislação). ${Store.temPinAssistencia() ? "<strong>Status: criado ✓</strong>" : "<strong>Status: ainda não criado</strong>"}`,
-      `<button class="btn accent" data-action="pinAssistencia">${Store.temPinAssistencia() ? "Trocar" : "Criar"} PIN da assistência social</button>`)}
-
-    ${item("PINs dos professores",
-      "Cada professor tem um PIN individual, definido no cadastro dele (o campo só aparece para o admin). Com o PIN, ele acessa apenas as próprias turmas e chamadas.",
-      `<a class="btn ghost" href="#/professores" style="text-decoration:none;">Abrir cadastro de professores &rarr;</a>`)}
-
-    ${item("PINs dos profissionais de saúde",
-      "Mesmo esquema: PIN individual no cadastro de cada profissional, com acesso restrito aos próprios pacientes e agenda.",
-      `<a class="btn ghost" href="#/atendimentos/profissionais" style="text-decoration:none;">Abrir cadastro de profissionais &rarr;</a>`)}
 
     <div class="panel">
       <h3>Quem acessa o quê</h3>
       <p class="panel-sub">Resumo das permissões</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>Perfil</th><th>Como entra</th><th>O que vê</th></tr></thead>
+        <thead><tr><th>Perfil</th><th>O que alcança</th></tr></thead>
         <tbody>
-          <tr><td><span class="pill info">Admin</span></td><td>Perfil "Administração" + senha</td><td>Tudo, inclusive esta página e o Financeiro</td></tr>
-          <tr><td><span class="pill info">Presidência</span></td><td>Perfil "Presidência" + senha</td><td>Acesso total, igual ao admin</td></tr>
-          <tr><td><span class="pill ok">Secretaria</span></td><td>Perfil "Secretaria" + senha</td><td>Operação completa, exceto logins e Financeiro</td></tr>
-          <tr><td><span class="pill warn">Gestor financeiro</span></td><td>Aba Financeiro + PIN</td><td>Somente o Financeiro</td></tr>
-          <tr><td><span class="pill muted">Professor</span></td><td>"Sou professor" + nome + PIN</td><td>Somente as turmas e alunos dele</td></tr>
-          <tr><td><span class="pill muted">Profissional</span></td><td>"Sou profissional de saúde" + nome + PIN</td><td>Somente os pacientes e agenda dele</td></tr>
-          <tr><td><span class="pill bad">Colaborador</span></td><td>Não tem acesso</td><td>Apenas cadastro interno (aba Professores &rarr; Funcionários e colaboradores)</td></tr>
+          <tr><td><span class="pill info">Admin</span></td><td>Tudo, inclusive esta página, o Financeiro e a "Minha área" de cada profissional</td></tr>
+          <tr><td><span class="pill info">Presidência</span></td><td>Quase tudo. Na área clínica vê <strong>apenas os nomes</strong> dos pacientes — nunca os atendimentos</td></tr>
+          <tr><td><span class="pill ok">Secretaria</span></td><td>Cadastros, chamada e agenda. Com limites no Financeiro, no Serviço Social e nos Atendimentos</td></tr>
+          <tr><td><span class="pill warn">Gestor financeiro</span></td><td>Somente o Financeiro</td></tr>
+          <tr><td><span class="pill warn">Serviço social</span></td><td>Somente o Serviço Social</td></tr>
+          <tr><td><span class="pill muted">Professor</span></td><td>Somente as próprias turmas, alunos e chamadas, enquanto o curso estiver ativo</td></tr>
+          <tr><td><span class="pill muted">Profissional de saúde</span></td><td>Somente os próprios pacientes e a própria agenda. Não vê os pacientes dos colegas</td></tr>
+          <tr><td><span class="pill bad">Colaborador</span></td><td>Não tem acesso. Apenas cadastro interno (Profissionais &rarr; Funcionários e colaboradores)</td></tr>
         </tbody>
       </table></div>
     </div>
@@ -588,28 +570,8 @@ Actions.perguntaSeguranca = () => {
   App.render();
 };
 
-Actions.pinAssistencia = () => {
-  if (!App.ehAdmin()) { U.toast("Apenas o administrador altera o PIN."); return; }
-  const pin = prompt("Novo PIN da assistência social (4 a 6 dígitos):");
-  if (pin === null) return;
-  if (!/^\d{4,6}$/.test(pin.trim())) { alert("O PIN deve ter de 4 a 6 dígitos numéricos."); return; }
-  Store.definirPinAssistencia(pin.trim());
-  U.toast("PIN da assistência social salvo.");
-  App.render();
-};
-
-Actions.pinFinanceiro = () => {
-  if (!App.ehAdmin()) { U.toast("Apenas o administrador altera o PIN."); return; }
-  const pin = prompt("Novo PIN do gestor financeiro (4 a 6 dígitos):");
-  if (pin === null) return;
-  if (!/^\d{4,6}$/.test(pin.trim())) { alert("O PIN deve ter de 4 a 6 dígitos numéricos."); return; }
-  Store.definirPinFinanceiro(pin.trim());
-  U.toast("PIN do financeiro salvo.");
-  App.render();
-};
-
 Actions.apagarTudo = () => {
-  if (confirm("Apagar TODOS os cadastros deste navegador?\n\nSerão removidos: alunos, turmas, chamadas, matrículas, pacientes, atendimentos, assistidos, lançamentos financeiros, agenda e documentos.\n\nSUAS SENHAS, PINs e a pergunta de segurança são MANTIDOS.\n\nEssa ação não pode ser desfeita. Exporte um backup antes, se precisar.")) {
+  if (confirm("Apagar TODOS os cadastros deste navegador?\n\nSerão removidos: alunos, turmas, chamadas, matrículas, pacientes, atendimentos, assistidos, lançamentos financeiros, agenda e documentos.\n\nSUAS SENHAS e a pergunta de segurança são MANTIDAS.\n\nEssa ação não pode ser desfeita. Exporte um backup antes, se precisar.")) {
     if (confirm("Tem certeza? Esta é a limpeza para começar a alimentar o sistema com os dados reais do instituto.")) {
       Store.limparTudo();
       U.toast("Cadastros apagados. Logins mantidos. Pronto para usar!");

@@ -1,6 +1,6 @@
 /* Assistência Social: cadastro de atendidos (com documentos e necessidades
    especiais), lista de espera por área, agenda interna e legislação.
-   Acesso: admin ou PIN próprio da assistência social. */
+   Acesso: conta com perfil de administração ou de serviço social. */
 "use strict";
 
 const CHAVE_AS_LOGADO = "bzn-as-logado";
@@ -36,37 +36,9 @@ function viewLoginAS() {
         <p>Área restrita à equipe da assistência social e ao administrador.</p>
       </div>
     </div>
-    <div class="panel" style="max-width:440px;">
-      <h3>Entrar na assistência social</h3>
-      <p class="panel-sub">Digite o PIN da assistência social</p>
-      ${Store.temPinAssistencia() ? `
-      <div class="form-grid" style="grid-template-columns:1fr;">
-        <div class="field">
-          <label for="as-pin">PIN</label>
-          <input id="as-pin" type="password" inputmode="numeric" maxlength="6" placeholder="4 a 6 dígitos" autocomplete="off">
-        </div>
-      </div>
-      <div class="form-actions">
-        <button class="btn accent" data-action="entrarAS">Entrar</button>
-      </div>`
-      : `<div class="alert-box info"><span class="ico">&#128274;</span><div>
-          <p>O PIN da assistência social ainda não foi criado.<br>
-          Peça ao administrador: botão <strong>&#9881; Logins</strong> no topo do sistema.</p>
-        </div></div>`}
-    </div>`;
+    ${U.painelSoConta("Entrar na assistência social", "Esta área é aberta pela sua conta")}`;
 }
 
-Actions.entrarAS = () => {
-  const pin = document.getElementById("as-pin").value.trim();
-  if (!Store.conferirPinAssistencia(pin)) {
-    U.toast("PIN incorreto.");
-    document.getElementById("as-pin").value = "";
-    return;
-  }
-  sessionStorage.setItem(CHAVE_AS_LOGADO, "1");
-  U.toast("Bem-vindo(a) à assistência social!");
-  App.render();
-};
 Actions.sairAS = () => {
   sessionStorage.removeItem(CHAVE_AS_LOGADO);
   location.hash = "#/dashboard";

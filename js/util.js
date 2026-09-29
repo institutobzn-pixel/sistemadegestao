@@ -106,7 +106,27 @@ const U = {
     return Math.round((parte / total) * 100);
   },
 
-  /* hash simples para o PIN do profissional (organizacional, não criptografia forte) */
+  /* hash simples para as senhas de perfil e a resposta de segurança
+     (organizacional, não criptografia forte) */
+  /* Painel padrão de área restrita. Desde que cada pessoa tem conta própria,
+     não existe mais PIN por área: a entrada é sempre pela tela inicial, com
+     e-mail e senha, e o perfil da conta decide o que ela alcança. */
+  painelSoConta(titulo, descricao) {
+    return `
+      <div class="panel" style="max-width:480px;">
+        <h3>${titulo}</h3>
+        <p class="panel-sub">${descricao}</p>
+        <div class="alert-box info">
+          <span class="ico">&#128273;</span>
+          <div><p>Entre com <strong>seu e-mail e sua senha</strong> na tela inicial. Cada conta abre apenas as áreas do seu perfil.</p></div>
+        </div>
+        <div class="form-actions">
+          <a class="btn accent" href="#/dashboard" style="text-decoration:none;">Ir para a tela de entrada</a>
+        </div>
+        <p class="panel-sub" style="margin-top:10px;">Ainda não tem conta? Peça ao administrador.</p>
+      </div>`;
+  },
+
   hashPin(s) {
     let h = 5381;
     for (const c of String(s)) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0;

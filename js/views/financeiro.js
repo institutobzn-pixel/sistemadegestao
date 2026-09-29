@@ -1,6 +1,6 @@
 /* Área Financeira: extrato SICOOB (OFX/CSV), vendas/assinaturas da Guru (CSV),
    lançamentos manuais, categorias, gráficos e exportação.
-   Acesso: admin ou gestor financeiro (PIN definido pelo admin). */
+   Acesso: conta com perfil de administração ou financeiro. */
 "use strict";
 
 const CHAVE_FIN_LOGADO = "bzn-fin-logado";
@@ -287,38 +287,9 @@ function viewLoginFin() {
         <p>Área restrita ao administrador e ao gestor financeiro.</p>
       </div>
     </div>
-    <div class="panel" style="max-width:440px;">
-      <h3>Entrar no financeiro</h3>
-      <p class="panel-sub">Digite o PIN do gestor financeiro</p>
-      ${Store.temPinFinanceiro() ? `
-      <div class="form-grid" style="grid-template-columns:1fr;">
-        <div class="field">
-          <label for="fin-pin">PIN</label>
-          <input id="fin-pin" type="password" inputmode="numeric" maxlength="6" placeholder="4 a 6 dígitos" autocomplete="off">
-        </div>
-      </div>
-      <div class="form-actions">
-        <button class="btn accent" data-action="entrarFin">Entrar</button>
-      </div>`
-      : `<div class="alert-box info"><span class="ico">&#128274;</span><div>
-          <p>O PIN do gestor financeiro ainda não foi criado.<br>
-          Peça ao administrador: <strong>Indicadores &rarr; Relatórios &rarr; Segurança e logins</strong>.</p>
-        </div></div>`}
-    </div>
-  `;
+    ${U.painelSoConta("Entrar no financeiro", "Esta área é aberta pela sua conta")}`;
 }
 
-Actions.entrarFin = () => {
-  const pin = document.getElementById("fin-pin").value.trim();
-  if (!Store.conferirPinFinanceiro(pin)) {
-    U.toast("PIN incorreto.");
-    document.getElementById("fin-pin").value = "";
-    return;
-  }
-  sessionStorage.setItem(CHAVE_FIN_LOGADO, "1");
-  U.toast("Bem-vindo(a) ao financeiro!");
-  App.render();
-};
 Actions.sairFin = () => {
   sessionStorage.removeItem(CHAVE_FIN_LOGADO);
   location.hash = "#/dashboard";

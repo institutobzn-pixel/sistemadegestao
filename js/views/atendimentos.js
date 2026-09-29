@@ -63,7 +63,7 @@ function viewAtendRestrito() {
 }
 
 Views.atendimentos = param => {
-  /* a área do profissional tem controle próprio, por PIN */
+  /* a área do profissional tem controle próprio, pela conta dele */
   if (param === "minha-area") return viewMinhaArea();
   if (param === "meus-pacientes") return viewMeusPacientes();
 
@@ -350,13 +350,6 @@ function abrirFormProfSaude(p) {
           <label for="fps-email">E-mail</label>
           <input id="fps-email" name="email" type="email" value="${U.esc(p.email)}">
         </div>
-        ${App.ehAdmin() ? `
-        <div class="form-section">Acesso à "Minha área" (somente admin/presidência altera)</div>
-        <div class="field">
-          <label for="fps-pin">PIN de acesso (4 a 6 dígitos)</label>
-          <input id="fps-pin" name="pinNovo" type="password" inputmode="numeric" minlength="4" maxlength="6"
-            placeholder="${p.pinHash ? "já cadastrado — preencha para trocar" : "defina o PIN do profissional"}" autocomplete="new-password">
-        </div>` : ""}
         ${Anexos.campoHTML("Documentos (PDF)", "Registro no conselho, contrato, comprovantes, etc. Até 5 arquivos.")}
       </div>
       <div class="form-actions">
@@ -365,12 +358,7 @@ function abrirFormProfSaude(p) {
       </div>
     </form>`, dados => {
     if (!dados.nome.trim()) return false;
-    const { pinNovo, ...resto } = dados;
-    const obj = { id: p.id || undefined, ...resto, nome: dados.nome.trim(), pinHash: p.pinHash || "", arquivos: Anexos.lista() };
-    if (pinNovo && pinNovo.trim()) {
-      if (!/^\d{4,6}$/.test(pinNovo.trim())) { alert("O PIN deve ter de 4 a 6 dígitos numéricos."); return false; }
-      obj.pinHash = U.hashPin(pinNovo.trim());
-    }
+    const obj = { id: p.id || undefined, ...dados, nome: dados.nome.trim(), arquivos: Anexos.lista() };
     try {
       Store.upsert("profsaude", obj);
     } catch (e) {
@@ -386,7 +374,7 @@ function abrirFormProfSaude(p) {
 
 Actions.novoProfSaude = () => abrirFormProfSaude({
   nome: "", especialidade: Store.config.especialidades[0], crp: "", crm: "", registro: "",
-  dias: "", horarios: "", telefone: "", email: "", pinHash: "", arquivos: []
+  dias: "", horarios: "", telefone: "", email: "", arquivos: []
 });
 Actions.editarProfSaude = id => abrirFormProfSaude(Store.get("profsaude", id));
 Actions.excluirProfSaude = id => {
@@ -658,7 +646,7 @@ function avisoAdminNaArea(prof) {
     <div class="alert-box warn" style="margin-bottom:14px;">
       <span class="ico">&#9881;</span>
       <div><p>Você está na área de <strong>${U.esc(prof.nome)}</strong> como administração,
-      sem o PIN. ${U.esc(prof.nome.split(" ")[0])} vê exatamente estas mesmas telas.</p></div>
+      sem a conta dele. ${U.esc(prof.nome.split(" ")[0])} vê exatamente estas mesmas telas.</p></div>
     </div>`;
 }
 
@@ -742,7 +730,7 @@ function viewLoginProf() {
     ${App.podeClinica() && profs.length ? `
     <div class="panel" style="max-width:480px;">
       <h3>&#9881; Acesso da administração</h3>
-      <p class="panel-sub">Abrir a área de um profissional sem o PIN dele</p>
+      <p class="panel-sub">Abrir a área de um profissional sem a conta dele</p>
       <div class="form-grid" style="grid-template-columns:1fr;">
         <div class="field">
           <label for="admin-prof">Área a abrir</label>
@@ -760,57 +748,11 @@ function viewLoginProf() {
       </div>
     </div>` : ""}
 
-    <div class="panel" style="max-width:480px;">
-      <h3>Entrar</h3>
-      <p class="panel-sub">Escolha seu nome e digite seu PIN</p>
-      ${profs.length ? `
-      <div class="form-grid" style="grid-template-columns:1fr;">
-        <div class="field">
-          <label for="login-prof">Profissional</label>
-          <select id="login-prof">
-            ${profs.map(p => `<option value="${p.id}">${U.esc(p.nome + " — " + p.especialidade)}</option>`).join("")}
-          </select>
-        </div>
-        <div class="field">
-          <label for="login-pin">PIN</label>
-          <input id="login-pin" type="password" inputmode="numeric" maxlength="6" placeholder="4 a 6 dígitos" autocomplete="off">
-        </div>
-      </div>
-      <div class="form-actions">
-        <button class="btn accent" data-action="entrarProf">Entrar</button>
-      </div>
-      <div class="alert-box info" style="margin-top:14px;">
-        <span class="ico">&#128274;</span>
-        <div><p>O PIN é cadastrado pela secretaria no formulário do profissional (aba Profissionais). Esta área organiza o acesso no dia a dia, mas os dados continuam no navegador deste computador.</p></div>
-      </div>`
-      : `<div class="empty-note" style="text-align:left;">
-          <p style="margin:0 0 8px;"><strong>Nenhum profissional aparece neste aparelho.</strong></p>
-          <p style="margin:0 0 12px; font-size:0.9rem;">Se o instituto já usa o sistema, é porque <strong>este computador ainda não baixou os dados</strong> da nuvem. Traga-os uma vez (depois é só entrar com o PIN):</p>
-          <button class="btn accent" data-action="conectarNuvem">&#9729;&#65039; Trazer os dados do instituto</button>
-          <p style="margin:12px 0 0; font-size:0.82rem; color:var(--text-muted);">Se for a primeiríssima vez do instituto, cadastre a equipe na aba <strong>Profissionais</strong> (entrando como admin).</p>
-        </div>`}
-    </div>
+    ${U.painelSoConta("Entrar na sua área", "Esta área é aberta pela sua conta")}
   `;
 }
 
-Actions.entrarProf = () => {
-  const id = document.getElementById("login-prof").value;
-  const pin = document.getElementById("login-pin").value.trim();
-  const p = Store.get("profsaude", id);
-  if (!p) return;
-  if (!p.pinHash) { alert("Este profissional ainda não tem PIN cadastrado.\nPeça para a secretaria definir o PIN na aba Profissionais → editar."); return; }
-  if (U.hashPin(pin) !== p.pinHash) {
-    U.toast("PIN incorreto.");
-    document.getElementById("login-pin").value = "";
-    document.getElementById("login-pin").focus();
-    return;
-  }
-  sessionStorage.setItem(CHAVE_PROF_LOGADO, p.id);
-  U.toast(`Bem-vindo(a), ${p.nome.split(" ")[0]}!`);
-  App.render();
-};
-
-/* A administração abre a área de um profissional sem o PIN dele. É uma
+/* A administração abre a área de um profissional sem a conta dele. É uma
    exceção deliberada, sinalizada na tela enquanto durar. */
 Actions.entrarProfAdmin = () => {
   if (!App.podeClinica()) return;

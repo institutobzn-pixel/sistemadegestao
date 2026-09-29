@@ -274,7 +274,7 @@ Actions.conectarNuvem = () => {
   App.abrirModal("Trazer os dados do instituto", `
     <p style="font-size:0.9rem; margin-bottom:12px;">
       Este aparelho ainda não baixou os dados. Cole o endereço e a chave (o admin fornece,
-      ou use o link/QR de acesso). Depois é só entrar com o seu PIN.
+      ou use o link/QR de acesso). Depois é só entrar com o seu e-mail e senha.
     </p>
     <div class="field">
       <label for="cn-url">Endereço (Project URL)</label>
@@ -301,6 +301,6 @@ Actions.conectarNuvemOk = async () => {
   if (!r.ok) { alert("Não foi possível conectar.\n\n" + r.msg); return; }
   await Nuvem.iniciar();
   App.fecharModal();
-  U.toast("Dados baixados! Agora entre com seu PIN.");
+  U.toast("Dados baixados! Agora entre com seu e-mail e senha.");
   App.render();
 };

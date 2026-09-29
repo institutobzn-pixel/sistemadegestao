@@ -41,7 +41,7 @@ Views.pacienteDetalhe = id => {
   if (!p) return `<div class="panel"><div class="empty-note">Paciente não encontrado.</div></div>`;
 
   /* Só abre a ficha quem é administração ou o profissional dono do paciente.
-     Fecha também a secretaria, que não passa pelo login por PIN e chegaria
+     Fecha também a secretaria, que não passa pelo login do profissional e chegaria
      aqui pelos links de nome da agenda e dos relatórios. */
   const prof = (typeof profLogado === "function") ? profLogado() : null;
   const podeVer = App.podeClinica() ||

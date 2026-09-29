@@ -196,13 +196,6 @@ function abrirFormProf(p) {
         </div>
         <div class="form-section">Documentos e dados pessoais</div>
         ${camposPessoaisHTML(p, "fp")}
-        ${App.ehAdmin() ? `
-        <div class="form-section">Acesso à "Área do professor" (somente admin/presidência altera)</div>
-        <div class="field">
-          <label for="fp-pin">PIN de acesso (4 a 6 dígitos)</label>
-          <input id="fp-pin" name="pinNovo" type="password" inputmode="numeric" minlength="4" maxlength="6"
-            placeholder="${p.pinHash ? "já cadastrado — preencha para trocar" : "defina o PIN do professor"}" autocomplete="new-password">
-        </div>` : ""}
       </div>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
@@ -210,15 +203,10 @@ function abrirFormProf(p) {
       </div>
     </form>`, dados => {
     if (!dados.nome.trim()) return false;
-    const { pinNovo, ...resto } = dados;
     const obj = {
-      id: p.id || undefined, ...resto, nome: dados.nome.trim(),
-      pinHash: p.pinHash || "", arquivos: arquivosForm.slice(0, MAX_ARQUIVOS)
+      id: p.id || undefined, ...dados, nome: dados.nome.trim(),
+      arquivos: arquivosForm.slice(0, MAX_ARQUIVOS)
     };
-    if (pinNovo && pinNovo.trim()) {
-      if (!/^\d{4,6}$/.test(pinNovo.trim())) { alert("O PIN deve ter de 4 a 6 dígitos numéricos."); return false; }
-      obj.pinHash = U.hashPin(pinNovo.trim());
-    }
     try {
       Store.upsert("professores", obj);
     } catch (e) {
@@ -232,7 +220,7 @@ function abrirFormProf(p) {
 }
 
 const PROF_VAZIO = {
-  nome: "", telefone: "", email: "", formacao: "", experiencia: "", pinHash: "",
+  nome: "", telefone: "", email: "", formacao: "", experiencia: "",
   nascimento: "", dataInicio: "", cpf: "", cnpj: "", endereco: "", bairro: "",
   cidade: "", cep: "", pix: "", arquivos: []
 };
@@ -360,7 +348,7 @@ Actions.excluirEquipe = id => {
   }
 };
 
-/* ---------------- Área do professor (acesso restrito por PIN) ---------------- */
+/* -------------- Área do professor (acesso restrito por conta) -------------- */
 
 const CHAVE_PROFESSOR_LOGADO = "bzn-professor-logado";
 
@@ -375,7 +363,6 @@ function professorLogado() {
 Views.professorArea = () => {
   const prof = professorLogado();
   if (!prof) {
-    const profs = U.ordenarPorNome(Store.col("professores"));
     return `
       <div class="page-head">
         <div>
@@ -384,35 +371,7 @@ Views.professorArea = () => {
         </div>
         <div class="head-actions"><a class="btn ghost" href="#/professores" style="text-decoration:none;">&larr; Voltar</a></div>
       </div>
-      <div class="panel" style="max-width:480px;">
-        <h3>Entrar</h3>
-        <p class="panel-sub">Escolha seu nome e digite seu PIN</p>
-        ${profs.length ? `
-        <div class="form-grid" style="grid-template-columns:1fr;">
-          <div class="field">
-            <label for="login-professor">Professor</label>
-            <select id="login-professor">
-              ${profs.map(p => `<option value="${p.id}">${U.esc(p.nome)}</option>`).join("")}
-            </select>
-          </div>
-          <div class="field">
-            <label for="login-pin-prof">PIN</label>
-            <input id="login-pin-prof" type="password" inputmode="numeric" maxlength="6" placeholder="4 a 6 dígitos" autocomplete="off">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn accent" data-action="entrarProfessor">Entrar</button>
-        </div>
-        <div class="alert-box info" style="margin-top:14px;">
-          <span class="ico">&#128274;</span>
-          <div><p>O PIN é cadastrado pela secretaria no formulário do professor (aba Professores → editar).</p></div>
-        </div>`
-        : `<div class="empty-note" style="text-align:left;">
-            <p style="margin:0 0 8px;"><strong>Nenhum professor aparece neste aparelho.</strong></p>
-            <p style="margin:0 0 12px; font-size:0.9rem;">Se o instituto já usa o sistema, é porque <strong>este computador ainda não baixou os dados</strong> da nuvem. Traga-os uma vez (depois é só entrar com o PIN):</p>
-            <button class="btn accent" data-action="conectarNuvem">&#9729;&#65039; Trazer os dados do instituto</button>
-          </div>`}
-      </div>
+      ${U.painelSoConta("Entrar na sua área", "Esta área é aberta pela sua conta")}
     `;
   }
 
@@ -530,23 +489,6 @@ Views.professorArea = () => {
 
     ${blocosAlunos}
   `;
-};
-
-Actions.entrarProfessor = () => {
-  const id = document.getElementById("login-professor").value;
-  const pin = document.getElementById("login-pin-prof").value.trim();
-  const p = Store.get("professores", id);
-  if (!p) return;
-  if (!p.pinHash) { alert("Este professor ainda não tem PIN cadastrado.\nPeça para a secretaria definir o PIN na aba Professores → editar."); return; }
-  if (U.hashPin(pin) !== p.pinHash) {
-    U.toast("PIN incorreto.");
-    document.getElementById("login-pin-prof").value = "";
-    document.getElementById("login-pin-prof").focus();
-    return;
-  }
-  sessionStorage.setItem(CHAVE_PROFESSOR_LOGADO, p.id);
-  U.toast(`Bem-vindo(a), ${p.nome.split(" ")[0]}!`);
-  App.render();
 };
 
 Actions.sairProfessor = () => {
