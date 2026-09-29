@@ -81,7 +81,26 @@ const Store = (() => {
     if (db.cursos.length === 0 && !localStorage.getItem(KEY)) {
       seedCursos();
     }
-    carregarMigracoes();
+    /* se a migração removeu PINs antigos, grava e leva a limpeza à nuvem */
+    if (carregarMigracoes()) salvar();
+  }
+
+  /* Limpeza única dos PINs. Eles deixaram de existir quando cada pessoa passou
+     a entrar pela própria conta, mas os hashes seguiam guardados nos cadastros
+     e na configuração, sem ninguém para lê-los. Dado morto — e dado morto de
+     senha é melhor apagar do que deixar viajando junto com o resto.
+     Devolve true se removeu alguma coisa, para quem chamou decidir se salva. */
+  function limparPinsAntigos() {
+    let mexeu = false;
+    for (const col of ["professores", "profsaude"]) {
+      for (const r of (Array.isArray(db[col]) ? db[col] : [])) {
+        if ("pinHash" in r) { delete r.pinHash; mexeu = true; }
+      }
+    }
+    for (const campo of ["pinAssistenciaHash", "pinFinanceiroHash"]) {
+      if (db.config && campo in db.config) { delete db.config[campo]; mexeu = true; }
+    }
+    return mexeu;
   }
 
   // migrações leves para backups/dados antigos/dados vindos da nuvem
@@ -117,6 +136,7 @@ const Store = (() => {
     if (!Array.isArray(db.config.salas) || !db.config.salas.length) {
       db.config.salas = ["Sala 1", "Sala 2", "Sala 3", "Sala 4", "Sala 5", "Auditório", "Hall Superior", "Hall de Entrada"];
     }
+    return limparPinsAntigos();
   }
 
   /* senhas de acesso por nível (organizacional — os dados seguem no navegador)
@@ -849,6 +869,9 @@ const Store = (() => {
       throw new Error("Arquivo não parece ser um backup válido do painel.");
     }
     db = Object.assign(vazio(), dados);
+    /* um backup antigo pode trazer campos que não existem mais — PINs, por
+       exemplo — e faltar os que passaram a existir */
+    carregarMigracoes();
     salvar();
   }
 
