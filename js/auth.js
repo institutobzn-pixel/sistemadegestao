@@ -48,7 +48,7 @@ const Auth = (() => {
       return "Esta conta ainda não confirmou o e-mail. Peça ao administrador para confirmar no Supabase.";
     }
     if (status === 429) return "Muitas tentativas. Espere um minuto e tente de novo.";
-    if (status === 0) return "Sem conexão com a nuvem.";
+    if (status === 0) return "O sistema está fora do ar no momento. Não é problema com a sua senha — avise o administrador e tente de novo em alguns minutos.";
     return msg || `Falha na autenticação (${status}).`;
   }
 
@@ -64,7 +64,8 @@ const Auth = (() => {
       });
       dados = await r.json().catch(() => ({}));
     } catch (e) {
-      return { ok: false, msg: "Sem conexão com a nuvem." };
+      /* o fetch nem chegou ao servidor: nuvem hibernada ou sem internet */
+      return { ok: false, msg: "O sistema está fora do ar no momento. Não é problema com a sua senha — avise o administrador e tente de novo em alguns minutos." };
     }
     if (!r.ok) return { ok: false, msg: mensagemErro(r.status, dados) };
 
@@ -125,7 +126,8 @@ const Auth = (() => {
       });
       dados = await r.json().catch(() => ({}));
     } catch (e) {
-      return { ok: false, msg: "Sem conexão com a nuvem." };
+      /* o fetch nem chegou ao servidor: nuvem hibernada ou sem internet */
+      return { ok: false, msg: "O sistema está fora do ar no momento. Sua senha atual continua valendo; tente trocá-la de novo em alguns minutos." };
     }
     if (!r.ok) {
       const msg = (dados && (dados.msg || dados.message || dados.error_description)) || "";

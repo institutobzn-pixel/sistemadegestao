@@ -1,0 +1,48 @@
+# Impede que o projeto do Supabase hiberne.
+#
+# No plano gratuito, um projeto sem nenhum acesso por cerca de 7 dias e posto
+# para dormir. Quando isso acontece ninguem consegue entrar no sistema, e so o
+# administrador pode reativa-lo pelo painel — a equipe fica parada ate alguem
+# perceber. Esta rotina visita o banco duas vezes por semana, o que conta como
+# uso e mantem o projeto de pe sozinho.
+#
+# Usa a chave publicavel, a mesma que ja vai no codigo do app e que sozinha nao
+# le nem escreve nada (a regra da tabela exige login). Le a chave do proprio
+# js/nuvem.js para nao existirem duas copias que possam divergir.
+
+name: Manter a nuvem ativa
+
+on:
+  schedule:
+    # segunda e quinta, 06:20 UTC (03:20 em Brasilia) — longe do pico
+    - cron: "20 6 * * 1,4"
+  workflow_dispatch:   # permite rodar na mao pelo site do GitHub
+
+jobs:
+  visitar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Visitar o Supabase
+        run: |
+          set -u
+          url=$(grep -oP 'URL_PADRAO = "\K[^"]+' js/nuvem.js)
+          key=$(grep -oP 'KEY_PADRAO = "\K[^"]+' js/nuvem.js)
+          if [ -z "$url" ] || [ -z "$key" ]; then
+            echo "Nao achei URL_PADRAO/KEY_PADRAO em js/nuvem.js."
+            echo "Se o arquivo mudou, atualize esta rotina."
+            exit 1
+          fi
+          echo "Visitando $url"
+          codigo=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "apikey: $key" \
+            "$url/rest/v1/painel?select=id&limit=1")
+          echo "Resposta: HTTP $codigo"
+          # 200 = respondeu. 401/403 = respondeu e a regra barrou (esperado sem
+          # login) — em ambos o projeto esta acordado, que e o objetivo.
+          case "$codigo" in
+            200|401|403) echo "Projeto ativo."; exit 0 ;;
+            000) echo "Nao houve resposta (rede ou projeto hibernado)."; exit 1 ;;
+            *)   echo "Resposta inesperada: HTTP $codigo"; exit 1 ;;
+          esac

@@ -188,6 +188,7 @@ const App = (() => {
 
   /* ---------- portão de entrada (perfis: admin, presidência, secretaria) ---------- */
   let portaoTentouBaixar = false;
+  let portaoNuvemFora = false;   // a nuvem está configurada, mas não respondeu
   function renderPortao() {
     document.querySelectorAll("#nav-tabs a").forEach(a => a.classList.remove("active"));
     const view = document.getElementById("view");
@@ -205,10 +206,34 @@ const App = (() => {
           <p class="panel-sub">Este aparelho está conectado à nuvem e está baixando os cadastros e as senhas. A tela de login aparece sozinha em instantes.</p>
           <div class="form-actions"><button class="btn accent" id="portao-baixar">Baixar agora</button></div>
         </div>`;
-      const baixar = async () => { try { await Nuvem.verificar(); } catch (e) {} render(); };
+      const baixar = async () => {
+        try { await Nuvem.verificar(); } catch (e) { /* o status abaixo conta a história */ }
+        portaoNuvemFora = Nuvem.statusAtual().estado === "erro";
+        render();
+      };
       const b = document.getElementById("portao-baixar");
       if (b) b.addEventListener("click", baixar);
       baixar();
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    /* Aparelho sem nada guardado e nuvem sem responder (projeto hibernado,
+       internet caída). Antes, a pessoa caía na tela de "primeiro acesso" e via,
+       lado a lado, um campo pedindo chave técnica e um botão de criar o sistema
+       do zero — que fabrica um sistema paralelo e vazio. Uma frase só resolve
+       melhor: não é a senha dela, e não há nada que ela possa fazer sozinha. */
+    if (primeiraVez && nuvemCfg && portaoNuvemFora) {
+      view.innerHTML = `
+        <div class="panel" style="max-width:440px; margin:40px auto 0;">
+          <h3 style="margin-bottom:2px;">O sistema está fora do ar no momento</h3>
+          <p class="panel-sub">Não é problema com a sua senha, e não é preciso cadastrar nada de novo. O servidor do instituto não está respondendo — avise o administrador e tente novamente em alguns minutos.</p>
+          <div class="form-actions"><button class="btn accent" id="portao-retentar">Tentar de novo</button></div>
+        </div>`;
+      const r = document.getElementById("portao-retentar");
+      if (r) r.addEventListener("click", () => {
+        portaoTentouBaixar = false; portaoNuvemFora = false; render();
+      });
       window.scrollTo(0, 0);
       return;
     }
@@ -218,7 +243,7 @@ const App = (() => {
        área) vira alternativa de emergência: fica recolhido para não competir
        com o login de verdade. Quem chegava nesta tela via duas portas lado a
        lado e escolhia a errada. */
-    const legado = comNuvem && !primeiraVez;
+    const legado = comNuvem;
 
     view.innerHTML = `
       ${comNuvem ? `
@@ -242,7 +267,7 @@ const App = (() => {
       </div>` : ""}
 
       ${legado ? `<details class="entrada-antiga">
-        <summary>Não tenho conta de e-mail — usar o acesso antigo</summary>` : ""}
+        <summary>${primeiraVez ? "Configuração avançada — primeiro acesso do instituto" : "Não tenho conta de e-mail — usar o acesso antigo"}</summary>` : ""}
       <div class="panel" style="max-width:440px; margin:${legado ? "10px" : (comNuvem ? "18px" : "40px")} auto 0;">
         <h3 style="margin-bottom:2px;">${primeiraVez ? "Primeiro acesso neste aparelho" : "Acesso restrito"}</h3>
         <p class="panel-sub">${primeiraVez

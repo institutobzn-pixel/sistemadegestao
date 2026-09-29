@@ -168,7 +168,11 @@ const Nuvem = (() => {
     if (!configurada()) return;
     try {
       const linha = await baixar();
-      if (!linha) return;
+      /* sem linha = a nuvem respondeu e devolveu vazio (o normal para quem
+         ainda não entrou: a regra da tabela exige sessão autenticada). Marcar
+         "ok" mesmo assim importa, senão um erro anterior nunca é limpo e a
+         tela de "fora do ar" continua aparecendo depois que a nuvem volta. */
+      if (!linha) { marcarStatus("ok"); return; }
       if (linha.atualizado_em && linha.atualizado_em === ultimoRemoto) return; // nada novo
       ultimoRemoto = linha.atualizado_em || ultimoRemoto;
       // mescla protegida: a nuvem manda, mas não apaga uma coleção que só existe aqui
