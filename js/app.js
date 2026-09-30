@@ -58,6 +58,41 @@ const App = (() => {
   const CHAVE_NIVEL = "bzn-nivel";
   const nivel = () => sessionStorage.getItem(CHAVE_NIVEL) || "";
 
+  /* ---------- expiração por inatividade ----------
+     Quinze minutos sem operar e a sessão cai, como nos aplicativos de banco.
+     Não substitui o bloqueio de tela do aparelho — se alguém pegar o celular
+     destravado dentro da janela, entra —, mas encurta muito essa janela.
+     O carimbo fica no sessionStorage: morre junto com a sessão, e não deixa
+     rastro de uso no aparelho. */
+  const LIMITE_INATIVIDADE = 15 * 60 * 1000;
+  const K_ULTIMO_USO = "bzn-ultimo-uso";
+
+  function sessaoAberta() {
+    return !!(sessionStorage.getItem(CHAVE_NIVEL) ||
+      sessionStorage.getItem("bzn-prof-logado") ||
+      sessionStorage.getItem("bzn-professor-logado") ||
+      sessionStorage.getItem("bzn-as-logado") ||
+      sessionStorage.getItem("bzn-fin-logado"));
+  }
+
+  function expirou() {
+    const t = Number(sessionStorage.getItem(K_ULTIMO_USO) || 0);
+    return t > 0 && (Date.now() - t) > LIMITE_INATIVIDADE;
+  }
+
+  /* Chamado a cada toque e a cada tecla, em fase de captura: precisa conferir
+     o tempo ANTES de renovar o carimbo, senão o próprio toque que acontece
+     depois do prazo salvaria a sessão que já devia ter caído. */
+  function registrarAtividade() {
+    if (!sessaoAberta()) return;
+    if (expirou()) { sair({ porInatividade: true }); return; }
+    sessionStorage.setItem(K_ULTIMO_USO, String(Date.now()));
+  }
+
+  function conferirInatividade() {
+    if (sessaoAberta() && expirou()) sair({ porInatividade: true });
+  }
+
   /* admin e presidente têm acesso total à gestão (inclusive Logins e Financeiro) */
   const ehAdmin = () => { const n = nivel(); return n === "admin" || n === "presidente"; };
 
@@ -87,6 +122,12 @@ const App = (() => {
   }
 
   function render() {
+    /* antes de desenhar: a sessão ainda vale? (sair() re-renderiza sem laço,
+       porque a essa altura não há mais sessão aberta) */
+    if (sessaoAberta() && expirou()) { sair({ porInatividade: true }); return; }
+    if (sessaoAberta() && !sessionStorage.getItem(K_ULTIMO_USO)) {
+      sessionStorage.setItem(K_ULTIMO_USO, String(Date.now()));
+    }
     const hash = location.hash.replace(/^#\//, "") || "dashboard";
     const [rota, param] = hash.split("/");
     const fn = rotas[rota] || rotas.dashboard;
@@ -595,8 +636,9 @@ const App = (() => {
   const btnSeguranca = document.getElementById("btn-seguranca");
   if (btnSeguranca) btnSeguranca.addEventListener("click", () => { location.hash = "#/seguranca"; });
 
-  const sair = () => {
+  function sair(opcoes) {
     sessionStorage.removeItem(CHAVE_NIVEL);
+    sessionStorage.removeItem(K_ULTIMO_USO);
     /* quem entrou por conta sai da conta também, senão continuaria
        autenticado na nuvem depois de "sair" do sistema */
     if (typeof Auth !== "undefined" && Auth.logado()) Auth.sair();
@@ -607,14 +649,32 @@ const App = (() => {
     document.getElementById("nav-tabs").classList.remove("open");
     location.hash = "#/dashboard";
     render();
-  };
+    if (opcoes && opcoes.porInatividade) {
+      U.toast("Sessão encerrada por inatividade. Entre de novo para continuar.");
+    }
+  }
   const btnSairSistema = document.getElementById("btn-sair-sistema");
-  if (btnSairSistema) btnSairSistema.addEventListener("click", sair);
+  if (btnSairSistema) btnSairSistema.addEventListener("click", () => sair());
   const navSairLink = document.getElementById("nav-sair");
   if (navSairLink) navSairLink.addEventListener("click", ev => { ev.preventDefault(); sair(); });
 
+  ["pointerdown", "keydown"].forEach(ev =>
+    document.addEventListener(ev, registrarAtividade, true));
+  /* o relógio cobre quem deixa a tela parada; o visibilitychange cobre o
+     celular, que congela temporizadores enquanto o app está em segundo plano */
+  setInterval(conferirInatividade, 30_000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) conferirInatividade();
+  });
+
   window.addEventListener("hashchange", render);
-  window.addEventListener("DOMContentLoaded", render);
+  window.addEventListener("DOMContentLoaded", () => {
+    /* Sobra da sessão anterior: o perfil morre quando o app fecha, mas o token
+       da conta ficava guardado no aparelho indefinidamente. Sem perfil ele não
+       serve para nada aqui — e credencial parada não deve ficar por aí. */
+    if (!sessaoAberta() && typeof Auth !== "undefined" && Auth.logado()) Auth.sair();
+    render();
+  });
 
   return { render, abrirModal, fecharModal, nivel, ehAdmin, podeClinica };
 })();
