@@ -3,12 +3,61 @@
 
 let chamadaAtual = { turmaId: "", data: U.hojeISO(), conteudo: "", presencas: {} };
 
+/* Uma aula já lançada abre trancada. Antes bastava um toque a mais na tela
+   para trocar presença por falta sem ninguém perceber — e a chamada é o que
+   sustenta a frequência e o certificado do aluno. Para alterar, é preciso
+   pedir "Editar" antes. Aula nova nasce destravada: ali não há o que perder. */
+let chamadaDestravada = false;
+
+/* Quando quem abriu a tela é um professor, a chamada inteira se restringe às
+   turmas dele — o seletor, a turma vinda pela URL e as ações de gravar. Sem
+   isso bastaria trocar o endereço para lançar presença na turma de outro. */
+function professorDaChamada() {
+  const id = sessionStorage.getItem("bzn-professor-logado");
+  return id ? Store.get("professores", id) : null;
+}
+
+function turmasDoChamador() {
+  const prof = professorDaChamada();
+  const todas = Store.col("turmas");
+  return prof ? todas.filter(t => t.professorId === prof.id) : todas;
+}
+
+function podeChamarTurma(turmaId) {
+  const prof = professorDaChamada();
+  if (!prof) return true;
+  const t = Store.get("turmas", turmaId);
+  return !!(t && t.professorId === prof.id);
+}
+
 Views.chamada = turmaIdParam => {
-  const turmas = Store.col("turmas").filter(t => t.status === "em andamento" || t.status === "planejada");
-  const todasTurmas = Store.col("turmas");
+  const prof = professorDaChamada();
+  const todasTurmas = turmasDoChamador();
+  /* o professor alcança todas as turmas que já deu, a qualquer tempo; para a
+     gestão o seletor segue destacando as que estão correndo */
+  const turmas = prof ? todasTurmas
+    : todasTurmas.filter(t => t.status === "em andamento" || t.status === "planejada");
+
+  if (turmaIdParam && !podeChamarTurma(turmaIdParam)) {
+    return `
+      <div class="page-head"><div><h2>Lista de chamada</h2></div></div>
+      <div class="panel" style="max-width:480px;">
+        <div class="alert-box warn"><span class="ico">&#9888;&#65039;</span>
+          <div><p>Esta turma não é sua. Você faz a chamada apenas das turmas vinculadas ao seu cadastro.</p></div>
+        </div>
+        <div class="form-actions">
+          <a class="btn accent" href="#/professor" style="text-decoration:none;">Voltar para a minha área</a>
+        </div>
+      </div>`;
+  }
+  /* turma que sobrou de outra sessão e não pertence a esta pessoa */
+  if (chamadaAtual.turmaId && !podeChamarTurma(chamadaAtual.turmaId)) {
+    chamadaAtual = { turmaId: "", data: U.hojeISO(), conteudo: "", presencas: {} };
+  }
 
   if (turmaIdParam && chamadaAtual.turmaId !== turmaIdParam) {
     chamadaAtual = { turmaId: turmaIdParam, data: U.hojeISO(), conteudo: "", presencas: {} };
+    chamadaDestravada = false;   // trocou de turma: tranca de novo
   }
   if (!chamadaAtual.turmaId && turmas.length) chamadaAtual.turmaId = turmas[0].id;
 
@@ -24,6 +73,12 @@ Views.chamada = turmaIdParam => {
   let historicoHTML = "";
   let aulaJaExiste = false;
   let totalAulas = 0;
+
+  /* existente é descoberta abaixo; aqui basta saber se há aula gravada nesta
+     data para decidir se a tela abre trancada */
+  const jaGravada = !!(turmaSel && Store.col("chamadas")
+    .find(c => c.turmaId === turmaSel.id && c.data === chamadaAtual.data));
+  const travado = jaGravada && !chamadaDestravada;
 
   if (turmaSel) {
     const mats = Store.matriculasDaTurma(turmaSel.id).filter(m => m.status === "cursando" || m.status === "concluido");
@@ -49,8 +104,8 @@ Views.chamada = turmaIdParam => {
             </div>
           </div>
           <div class="presenca-toggle" data-aluno="${a.id}">
-            <button type="button" class="tp ${marcado === true ? "sel-p" : ""}" data-v="1">Presente</button>
-            <button type="button" class="tf ${marcado === false ? "sel-f" : ""}" data-v="0">Falta</button>
+            <button type="button" class="tp ${marcado === true ? "sel-p" : ""}" data-v="1" ${travado ? "disabled" : ""}>Presente</button>
+            <button type="button" class="tf ${marcado === false ? "sel-f" : ""}" data-v="0" ${travado ? "disabled" : ""}>Falta</button>
           </div>
         </div>`;
     }).join("") : `<div class="empty-note">Nenhum aluno matriculado nesta turma.<br>Matricule alunos pela ficha de cada aluno.</div>`;
@@ -70,7 +125,7 @@ Views.chamada = turmaIdParam => {
             <td>${U.esc(c.conteudo || "—")}</td>
             <td><span class="pill ${pres / total >= 0.75 ? "ok" : "warn"}">${pres}/${total}</span></td>
             <td style="white-space:nowrap">
-              <button class="btn sm ghost" data-action="abrirChamadaData" data-id="${c.data}">Editar</button>
+              <button class="btn sm ghost" data-action="abrirChamadaData" data-id="${c.data}">Abrir</button>
               <button class="icon-btn" data-action="excluirChamada" data-id="${c.id}" title="Excluir" aria-label="Excluir chamada">&#128465;</button>
             </td>
           </tr>`;
@@ -85,7 +140,8 @@ Views.chamada = turmaIdParam => {
         <p>Escolha a turma e a data, marque presença ou falta e salve. Cada data gera um registro no relatório de presença.</p>
       </div>
       <div class="head-actions">
-        <button class="btn" data-action="importarChamada" title="Importar chamada de uma planilha (CSV)">&#128196; Importar chamada</button>
+        ${prof ? `<a class="btn ghost" href="#/professor" style="text-decoration:none;">&larr; Minha área</a>`
+               : `<button class="btn" data-action="importarChamada" title="Importar chamada de uma planilha (CSV)">&#128196; Importar chamada</button>`}
       </div>
     </div>
 
@@ -118,21 +174,28 @@ Views.chamada = turmaIdParam => {
     <div class="panel">
       <h3>${curso ? U.esc(curso.nome) + " — " + U.esc(turmaSel.nome) : "Alunos"}</h3>
       <p class="panel-sub">
-        ${aulaJaExiste ? "&#9998; Editando a aula de" : "&#10133; Nova aula em"} <strong>${U.fmtData(chamadaAtual.data)}</strong>${turmaSel && turmaSel.horario ? " · " + U.esc(turmaSel.horario) : ""}
+        ${travado ? "&#128274; Aula registrada em" : aulaJaExiste ? "&#9998; Editando a aula de" : "&#10133; Nova aula em"} <strong>${U.fmtData(chamadaAtual.data)}</strong>${turmaSel && turmaSel.horario ? " · " + U.esc(turmaSel.horario) : ""}
       </p>
+      ${travado ? `<div class="alert-box info"><span class="ico">&#128274;</span><div>
+        <p>Esta aula já está registrada e abre protegida contra toques acidentais. Para trocar uma presença por falta, clique em <strong>Editar presenças</strong>.</p>
+      </div></div>` : ""}
       <div id="ch-lista">${listaAlunos}</div>
       <div class="form-actions">
-        <button class="btn ghost" data-action="addAlunosTurma">+ Adicionar alunos à turma</button>
-        <button class="btn accent" data-action="salvarChamada">${aulaJaExiste ? "Atualizar aula" : "Salvar aula"}</button>
+        ${prof ? "" : `<button class="btn ghost" data-action="addAlunosTurma">+ Adicionar alunos à turma</button>`}
+        ${travado
+          ? `<button class="btn accent" data-action="destravarChamada">&#9998; Editar presenças</button>`
+          : `<button class="btn accent" data-action="salvarChamada">${aulaJaExiste ? "Atualizar aula" : "Salvar aula"}</button>`}
       </div>
     </div>
 
     <div class="panel">
       <h3>Aulas registradas desta turma${totalAulas ? ` (${totalAulas})` : ""}</h3>
-      <p class="panel-sub">Cada linha é uma aula (uma data). Clique em <strong>Editar</strong> para abrir e corrigir a presença daquele dia.</p>
+      <p class="panel-sub">Cada linha é uma aula (uma data). Clique em <strong>Abrir</strong> para ver a presença daquele dia; para corrigi-la, use <strong>Editar presenças</strong> depois.</p>
       ${historicoHTML}
     </div>`
-    : `<div class="panel"><div class="empty-note">Nenhuma turma cadastrada.<br>Crie uma turma primeiro, na aba <strong>Turmas</strong>.</div></div>`}
+    : `<div class="panel"><div class="empty-note">${prof
+          ? "Você ainda não tem turmas vinculadas.<br>Peça à secretaria para vincular suas turmas ao seu cadastro."
+          : "Nenhuma turma cadastrada.<br>Crie uma turma primeiro, na aba <strong>Turmas</strong>."}</div></div>`}
   `;
 };
 
@@ -149,6 +212,7 @@ Views.aposRender = (rota, param) => {
 
   selTurma.addEventListener("change", () => {
     chamadaAtual = { turmaId: selTurma.value, data: inpData.value, conteudo: "", presencas: {} };
+    chamadaDestravada = false;
     location.hash = "#/chamada/" + selTurma.value;
     App.render();
   });
@@ -162,6 +226,7 @@ Views.aposRender = (rota, param) => {
     if (v === chamadaAtual.data) return;
     chamadaAtual.data = v;
     chamadaAtual.presencas = {};
+    chamadaDestravada = false;   // outra data, outra aula: tranca de novo
     App.render();
   });
   if (inpCont) inpCont.addEventListener("input", () => { chamadaAtual.conteudo = inpCont.value; });
@@ -182,6 +247,7 @@ Views.aposRender = (rota, param) => {
 Actions.salvarChamada = () => {
   const turma = Store.get("turmas", chamadaAtual.turmaId);
   if (!turma) return;
+  if (!podeChamarTurma(turma.id)) { U.toast("Esta turma não é sua."); return; }
   const data = document.getElementById("ch-data").value;
   const conteudo = document.getElementById("ch-cont").value.trim();
   if (!data) { U.toast("Escolha a data da aula."); return; }
@@ -206,6 +272,7 @@ Actions.salvarChamada = () => {
   });
   chamadaAtual.presencas = {};
   U.toast(existente ? "Chamada atualizada." : "Chamada salva.");
+  chamadaDestravada = false;   // gravou: volta a ficar protegida
   App.render();
 };
 
@@ -213,6 +280,7 @@ Actions.salvarChamada = () => {
    marca alunos já cadastrados e/ou digita nomes novos, um por linha */
 let addAlunosCtx = "";
 Actions.addAlunosTurma = turmaId => {
+  if (professorDaChamada()) { U.toast("Apenas a secretaria pode matricular alunos."); return; }
   addAlunosCtx = turmaId || chamadaAtual.turmaId;
   const turma = Store.get("turmas", addAlunosCtx);
   if (!turma) { U.toast("Escolha uma turma primeiro."); return; }
@@ -288,6 +356,12 @@ Actions.confirmarAddAlunos = () => {
   U.toast(add ? `${add} ${U.plural(add, "aluno adicionado", "alunos adicionados")} à turma.` : "Nenhum aluno novo para adicionar.");
 };
 
+Actions.destravarChamada = () => {
+  chamadaDestravada = true;
+  U.toast("Aula liberada para edição.");
+  App.render();
+};
+
 Actions.abrirChamadaData = data => {
   chamadaAtual.data = data;
   chamadaAtual.presencas = {};
@@ -304,6 +378,8 @@ Actions.novaAula = () => {
 };
 
 Actions.excluirChamada = id => {
+  const ch = Store.col("chamadas").find(c => c.id === id);
+  if (ch && !podeChamarTurma(ch.turmaId)) { U.toast("Esta turma não é sua."); return; }
   if (confirm("Excluir esta chamada?")) {
     Store.remover("chamadas", id);
     U.toast("Chamada excluída.");
@@ -319,6 +395,7 @@ Actions.excluirChamada = id => {
 let impChamada = null;
 
 Actions.importarChamada = () => {
+  if (professorDaChamada()) { U.toast("Apenas a secretaria pode importar chamada."); return; }
   if (!chamadaAtual.turmaId) { U.toast("Escolha uma turma primeiro."); return; }
   const turma = Store.get("turmas", chamadaAtual.turmaId);
   const curso = turma ? Store.get("cursos", turma.cursoId) : null;

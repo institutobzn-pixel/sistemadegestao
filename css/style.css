@@ -584,3 +584,15 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
 }
 .entrada-antiga > summary::-webkit-details-marker { display: none; }
 .entrada-antiga > summary:hover { color: var(--text); text-decoration: underline; }
+
+/* Chamada trancada: a aula já gravada abre protegida, e os botões de presença
+   precisam parecer intocáveis — senão a pessoa insiste no clique achando que
+   o sistema travou. */
+.presenca-toggle button[disabled] {
+  cursor: default;
+  opacity: 0.75;
+}
+.presenca-toggle button[disabled]:not(.sel-p):not(.sel-f) {
+  opacity: 0.4;
+  border-style: dashed;
+}

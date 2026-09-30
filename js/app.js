@@ -137,7 +137,12 @@ const App = (() => {
     /* rotas com controle próprio: professor, profissional de saúde e financeiro */
     const asLogado = sessionStorage.getItem("bzn-as-logado") === "1";
     const profSaudeLogado = !!sessionStorage.getItem("bzn-prof-logado");
+    const professorLogado = !!sessionStorage.getItem("bzn-professor-logado");
     const rotaLivre = rota === "professor" ||
+      /* a chamada é a razão de ser da área do professor: sem isto ele clicava
+         em "Fazer chamada" e era jogado no portão. A própria tela confere se a
+         turma é dele. */
+      (rota === "chamada" && professorLogado) ||
       /* quem entrou como profissional de saúde resolve tudo dentro de
          Atendimentos: a própria área abre, o resto recusa com aviso claro
          em vez de jogá-lo no portão de senha da administração */
