@@ -189,7 +189,10 @@ Views.chamada = turmaIdParam => {
     </div>
 
     <div class="panel">
-      <h3>Aulas registradas desta turma${totalAulas ? ` (${totalAulas})` : ""}</h3>
+      <div class="head-actions" style="justify-content:space-between; align-items:center; width:100%;">
+        <h3 style="margin:0;">Aulas registradas desta turma${totalAulas ? ` (${totalAulas})` : ""}</h3>
+        ${totalAulas ? `<button class="btn sm" data-action="csvChamadaTurma" title="Baixar a lista de chamada desta turma">&#11015;&#65039; Baixar lista</button>` : ""}
+      </div>
       <p class="panel-sub">Cada linha é uma aula (uma data). Clique em <strong>Abrir</strong> para ver a presença daquele dia; para corrigi-la, use <strong>Editar presenças</strong> depois.</p>
       ${historicoHTML}
     </div>`
@@ -354,6 +357,42 @@ Actions.confirmarAddAlunos = () => {
   App.fecharModal();
   App.render();
   U.toast(add ? `${add} ${U.plural(add, "aluno adicionado", "alunos adicionados")} à turma.` : "Nenhum aluno novo para adicionar.");
+};
+
+/* Baixa a chamada da turma selecionada como planilha: uma linha por aluno,
+   uma coluna por aula, e a frequência somada no fim. É o formato que serve
+   tanto para conferir no papel quanto para anexar a um relatório. */
+Actions.csvChamadaTurma = () => {
+  const turma = Store.get("turmas", chamadaAtual.turmaId);
+  if (!turma) { U.toast("Escolha uma turma primeiro."); return; }
+  if (!podeChamarTurma(turma.id)) { U.toast("Esta turma não é sua."); return; }
+
+  const aulas = Store.col("chamadas").filter(c => c.turmaId === turma.id)
+    .sort((a, b) => a.data.localeCompare(b.data));
+  if (!aulas.length) { U.toast("Esta turma ainda não tem aulas registradas."); return; }
+
+  const curso = Store.get("cursos", turma.cursoId);
+  const alunos = U.ordenarPorNome(Store.matriculasDaTurma(turma.id)
+    .map(m => Store.get("alunos", m.alunoId)).filter(Boolean));
+
+  const cab = ["Aluno", ...aulas.map(a => U.fmtData(a.data)), "Presenças", "Aulas", "Frequência %"];
+  const linhas = alunos.map(a => {
+    let pres = 0, tot = 0;
+    const celulas = aulas.map(au => {
+      if (!(a.id in au.presencas)) return "";   // aluno não estava matriculado nesta aula
+      tot++;
+      if (au.presencas[a.id]) { pres++; return "P"; }
+      return "F";
+    });
+    return U.linhaCSV([a.nome, ...celulas, pres, tot, tot ? Math.round(pres * 100 / tot) : ""]);
+  });
+
+  const nome = `chamada-${curso ? curso.nome : "turma"}-${turma.nome}`
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  U.baixarArquivo(`${nome}.csv`, "\ufeff" + [U.linhaCSV(cab), ...linhas].join("\n"),
+    "text/csv;charset=utf-8");
+  U.toast("Lista de chamada baixada.");
 };
 
 Actions.destravarChamada = () => {

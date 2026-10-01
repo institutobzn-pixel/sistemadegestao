@@ -14,6 +14,46 @@ function subnavEquipe(ativa) {
 }
 
 /* campos comuns a professores, funcionários e colaboradores */
+/* O vínculo turma↔professor vivia só dentro de cada turma: para dar três
+   turmas a alguém era preciso abrir as três. Como é esse vínculo que faz a
+   área do professor deixar de ficar vazia, ele passa a estar também aqui, no
+   cadastro da pessoa — onde se pensa "quais turmas são da Maiara". */
+function turmasCheckHTML(p) {
+  const turmas = Store.col("turmas").slice().sort((a, b) =>
+    (b.dataInicio || "").localeCompare(a.dataInicio || ""));
+  if (!turmas.length) {
+    return `<div class="empty-note" style="padding:16px;">Nenhuma turma cadastrada ainda. Crie as turmas na aba <strong>Turmas</strong> e volte aqui.</div>`;
+  }
+  return `<div class="turmas-check">${turmas.map(t => {
+    const c = Store.get("cursos", t.cursoId);
+    const dono = t.professorId && t.professorId !== p.id ? Store.get("professores", t.professorId) : null;
+    return `
+      <label class="turma-check">
+        <input type="checkbox" class="chk-turma" value="${t.id}" ${t.professorId === p.id ? "checked" : ""}>
+        <span>
+          <strong>${U.esc(c ? c.nome : "—")}</strong> · ${U.esc(t.nome)}
+          ${t.horario ? ` · ${U.esc(t.horario)}` : ""}
+          <em style="color:var(--text-muted); font-style:normal;"> — ${U.esc(t.status)}</em>
+          ${dono ? `<em style="color:var(--danger); font-style:normal;"> · hoje é de ${U.esc(dono.nome.split(" ")[0])}</em>` : ""}
+        </span>
+      </label>`;
+  }).join("")}</div>`;
+}
+
+/* Grava o que foi marcado. Só mexe nas turmas que realmente mudaram, para não
+   reescrever a coleção inteira a cada salvamento. */
+function aplicarTurmasDoProfessor(profId) {
+  const caixas = document.querySelectorAll(".chk-turma");
+  if (!caixas.length) return;   // o campo não estava na tela (sem permissão)
+  caixas.forEach(cx => {
+    const t = Store.get("turmas", cx.value);
+    if (!t) return;
+    const eraDele = t.professorId === profId;
+    if (cx.checked && !eraDele) Store.upsert("turmas", { ...t, professorId: profId });
+    else if (!cx.checked && eraDele) Store.upsert("turmas", { ...t, professorId: "" });
+  });
+}
+
 function camposPessoaisHTML(p, prefixo) {
   return `
     <div class="field">
@@ -194,6 +234,12 @@ function abrirFormProf(p) {
           <label for="fp-exp">Experiência profissional</label>
           <textarea id="fp-exp" name="experiencia">${U.esc(p.experiencia)}</textarea>
         </div>
+        ${App.ehAdmin() || App.nivel() === "secretaria" ? `
+        <div class="form-section">Turmas deste professor</div>
+        <div class="field full">
+          <p class="panel-sub" style="margin:0 0 8px;">Marque as turmas que são dele. É isto que faz as turmas e a chamada aparecerem na área dele quando entrar.</p>
+          ${turmasCheckHTML(p)}
+        </div>` : ""}
         <div class="form-section">Documentos e dados pessoais</div>
         ${camposPessoaisHTML(p, "fp")}
       </div>
@@ -207,12 +253,14 @@ function abrirFormProf(p) {
       id: p.id || undefined, ...dados, nome: dados.nome.trim(),
       arquivos: arquivosForm.slice(0, MAX_ARQUIVOS)
     };
+    let salvo;
     try {
-      Store.upsert("professores", obj);
+      salvo = Store.upsert("professores", obj);
     } catch (e) {
       alert("Não foi possível salvar: o armazenamento do navegador está cheio.\nRemova anexos e tente novamente.");
       return false;
     }
+    aplicarTurmasDoProfessor(salvo.id);
     U.toast("Professor salvo.");
     App.render();
   }, p);

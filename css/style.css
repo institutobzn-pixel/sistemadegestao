@@ -596,3 +596,16 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
   opacity: 0.4;
   border-style: dashed;
 }
+
+/* Turmas do professor dentro do cadastro dele: uma lista marcável, rolável
+   quando o instituto tiver muitas turmas. */
+.turmas-check {
+  max-height: 220px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px;
+}
+.turma-check {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 7px 8px; border-radius: 6px; cursor: pointer; font-size: 0.86rem;
+}
+.turma-check:hover { background: var(--navy-tint); }
+.turma-check input { margin-top: 3px; flex: none; }
