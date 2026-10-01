@@ -609,3 +609,10 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
 }
 .turma-check:hover { background: var(--navy-tint); }
 .turma-check input { margin-top: 3px; flex: none; }
+
+/* Professores do curso: linha derivada das turmas, com destaque para o que
+   ainda falta vincular. */
+.e-profs {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-top: 2px;
+}

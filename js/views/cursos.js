@@ -1,6 +1,30 @@
 /* Cursos: lista, ementa, módulos, carga horária */
 "use strict";
 
+/* Quem dá o curso vem das turmas, não do curso: um curso com cinco turmas
+   pode ter cinco professores diferentes. Por isso o nome é derivado aqui, e
+   não guardado de novo no cadastro do curso — duas fontes de verdade para o
+   mesmo fato acabam divergindo.
+   Turma sem professor aparece em destaque: enquanto ninguém estiver vinculado,
+   o professor entra numa área vazia e a chamada daquela turma não existe para
+   ele. Esta linha é o mapa do que ainda falta ligar. */
+function professoresHTML(turmas) {
+  if (!turmas.length) return "";
+  const nomes = new Map();
+  let semProfessor = 0;
+  for (const t of turmas) {
+    const p = t.professorId ? Store.get("professores", t.professorId) : null;
+    if (p) nomes.set(p.id, p.nome);
+    else semProfessor++;
+  }
+  const lista = [...nomes.values()].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  return `
+    <div class="e-meta e-profs">
+      ${lista.length ? `&#128100; ${lista.map(n => U.esc(n)).join(" · ")}` : ""}
+      ${semProfessor ? `<span class="pill warn">${semProfessor} ${U.plural(semProfessor, "turma sem professor", "turmas sem professor")}</span>` : ""}
+    </div>`;
+}
+
 Views.cursos = () => {
   const cursos = U.ordenarPorNome(Store.col("cursos"));
   const cards = cursos.map(c => {
@@ -29,6 +53,7 @@ Views.cursos = () => {
           ${c.modulos.length} ${U.plural(c.modulos.length, "módulo", "módulos")} · ${ch}h de carga horária<br>
           ${turmas.length} ${U.plural(turmas.length, "turma", "turmas")} · ${alunos} ${U.plural(alunos, "aluno", "alunos")}
         </div>
+        ${professoresHTML(turmas)}
         ${c.ementa ? `<div class="e-meta">${U.esc(c.ementa).slice(0, 160)}${c.ementa.length > 160 ? "…" : ""}</div>` : ""}
         ${c.modulos.length ? `<div class="cross-chips">${c.modulos.map(m =>
           `<span class="chip">${U.esc(m.nome)} · ${m.horas || 0}h</span>`).join("")}</div>` : ""}
