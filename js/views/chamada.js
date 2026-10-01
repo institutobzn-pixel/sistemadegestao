@@ -434,7 +434,10 @@ Actions.excluirChamada = id => {
 let impChamada = null;
 
 Actions.importarChamada = () => {
-  if (professorDaChamada()) { U.toast("Apenas a secretaria pode importar chamada."); return; }
+  /* importar matricula quem aparece na planilha e ainda não está na turma,
+     então cai na mesma regra de matricular alunos — e a mensagem precisa
+     dizer isso, senão parece proibição sem motivo */
+  if (professorDaChamada()) { U.toast("A importação matricula alunos na turma, e isso é da secretaria."); return; }
   if (!chamadaAtual.turmaId) { U.toast("Escolha uma turma primeiro."); return; }
   const turma = Store.get("turmas", chamadaAtual.turmaId);
   const curso = turma ? Store.get("cursos", turma.cursoId) : null;
