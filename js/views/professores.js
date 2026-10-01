@@ -477,6 +477,37 @@ Views.professorArea = () => {
       </div>`;
   }).join("");
 
+  /* os cursos das turmas dele, sem repetir: a ementa é do curso, não da turma */
+  const meusCursos = [];
+  const jaVistos = new Set();
+  for (const t of minhasTurmas) {
+    if (!t.cursoId || jaVistos.has(t.cursoId)) continue;
+    const c = Store.get("cursos", t.cursoId);
+    if (c) { jaVistos.add(c.id); meusCursos.push(c); }
+  }
+
+  const blocosCursos = meusCursos.map(c => {
+    const mods = c.modulos || [];
+    const ch = mods.reduce((soma, m) => soma + (Number(m.horas) || 0), 0);
+    const fotos = c.fotos || [];
+    return `
+      <div class="panel">
+        <h3><span class="chip cor-${c.corIndex || 8}">${U.esc(c.nome)}</span></h3>
+        <p class="panel-sub">${mods.length} ${U.plural(mods.length, "módulo", "módulos")} · ${ch}h de carga horária</p>
+        ${c.ementa
+          ? `<p style="white-space:pre-wrap;">${U.esc(c.ementa)}</p>`
+          : `<div class="empty-note" style="padding:18px;">A ementa deste curso ainda não foi preenchida pela secretaria.</div>`}
+        ${mods.length ? `<div class="cross-chips">${mods.map(m =>
+          `<span class="chip">${U.esc(m.nome)} · ${m.horas || 0}h</span>`).join("")}</div>` : ""}
+        ${fotos.length ? `<div class="foto-strip">${fotos.map((f, i) =>
+          `<img src="${f}" alt="Foto ${i + 1} de ${U.esc(c.nome)}" loading="lazy" data-action="verFoto" data-id="${c.id}:${i}">`).join("")}</div>` : ""}
+        <div class="form-actions">
+          <button class="btn ghost sm" data-action="addFotoCurso" data-id="${c.id}">&#128247; Adicionar fotos da aula</button>
+          <span style="font-size:0.78rem; color:var(--text-muted); align-self:center;">${fotos.length} de ${MAX_FOTOS}</span>
+        </div>
+      </div>`;
+  }).join("");
+
   return `
     <div class="page-head">
       <div>
@@ -536,7 +567,106 @@ Views.professorArea = () => {
     </div>` : ""}
 
     ${blocosAlunos}
+
+    ${blocosCursos}
+
+    <div class="panel">
+      <div class="head-actions" style="justify-content:space-between; align-items:center; width:100%;">
+        <h3 style="margin:0;">Meus dados</h3>
+        <button class="btn sm" data-action="editarMeusDados">&#9998; Editar</button>
+      </div>
+      <p class="panel-sub">Mantenha o contato em dia: é por aqui que a secretaria fala com você.</p>
+      <div class="rolar"><table>
+        <tbody>
+          ${[["Nome", prof.nome], ["Telefone", prof.telefone], ["E-mail", prof.email],
+             ["Formação", prof.formacao], ["Experiência", prof.experiencia]]
+            .map(([r, v]) => `<tr>
+              <th style="width:130px;">${r}</th>
+              <td>${v ? U.esc(v) : '<span style="color:var(--text-muted);">— não informado —</span>'}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table></div>
+    </div>
+
+    <input type="file" id="prof-foto-input" accept="image/*" multiple hidden>
   `;
+};
+
+/* O professor edita o próprio contato, e só isso: nome e documentos continuam
+   com a secretaria, que é quem responde pelo cadastro perante o instituto. */
+Actions.editarMeusDados = () => {
+  const prof = professorLogado();
+  if (!prof) return;
+  App.abrirModal("Meus dados", `
+    <form>
+      <p class="panel-sub" style="margin-top:0;">${U.esc(prof.nome)}</p>
+      <div class="form-grid" style="grid-template-columns:1fr;">
+        <div class="field">
+          <label for="md-tel">Telefone</label>
+          <input id="md-tel" name="telefone" value="${U.esc(prof.telefone || "")}">
+        </div>
+        <div class="field">
+          <label for="md-email">E-mail</label>
+          <input id="md-email" name="email" type="email" value="${U.esc(prof.email || "")}">
+        </div>
+        <div class="field">
+          <label for="md-form">Formação</label>
+          <input id="md-form" name="formacao" value="${U.esc(prof.formacao || "")}">
+        </div>
+        <div class="field">
+          <label for="md-exp">Experiência profissional</label>
+          <textarea id="md-exp" name="experiencia">${U.esc(prof.experiencia || "")}</textarea>
+        </div>
+      </div>
+      <p class="panel-sub">Para trocar seu nome ou seus documentos, fale com a secretaria.</p>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-modal-action="cancelar">Cancelar</button>
+        <button type="submit" class="btn accent">Salvar</button>
+      </div>
+    </form>`, dados => {
+    Store.upsert("professores", { ...prof, ...dados });
+    U.toast("Dados atualizados.");
+    App.render();
+  }, prof);
+};
+
+/* Fotos da aula: o professor acrescenta à galeria do curso que ele dá. Não
+   remove — tirar foto do registro de um curso é decisão da secretaria. */
+Actions.addFotoCurso = cursoId => {
+  const inp = document.getElementById("prof-foto-input");
+  if (!inp) return;
+  inp.dataset.curso = cursoId;
+  inp.click();
+};
+
+const aposRenderProfAnterior = Views.aposRender;
+Views.aposRender = (rota, param) => {
+  if (aposRenderProfAnterior) aposRenderProfAnterior(rota, param);
+  if (rota !== "professor") return;
+  const inp = document.getElementById("prof-foto-input");
+  if (!inp) return;
+  inp.onchange = async () => {
+    const c = Store.get("cursos", inp.dataset.curso);
+    const arquivos = [...inp.files];
+    inp.value = "";
+    if (!c || !arquivos.length) return;
+    const fotos = [...(c.fotos || [])];
+    let novas = 0;
+    for (const arq of arquivos) {
+      if (fotos.length >= MAX_FOTOS) { U.toast(`Limite de ${MAX_FOTOS} fotos por curso.`); break; }
+      if (!arq.type.startsWith("image/")) { U.toast(`"${arq.name}" não é uma imagem.`); continue; }
+      try { fotos.push(await U.comprimirImagem(arq)); novas++; } catch (e) { /* ignora a que falhar */ }
+    }
+    if (!novas) return;
+    try {
+      Store.upsert("cursos", { ...c, fotos });
+    } catch (e) {
+      alert("Não foi possível salvar as fotos: o armazenamento do navegador está cheio.");
+      return;
+    }
+    U.toast(`${novas} ${U.plural(novas, "foto adicionada", "fotos adicionadas")}.`);
+    App.render();
+  };
 };
 
 Actions.sairProfessor = () => {

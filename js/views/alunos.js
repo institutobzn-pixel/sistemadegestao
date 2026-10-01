@@ -51,7 +51,11 @@ Views.alunos = () => {
   `;
 };
 
-Views.aposRender = rota => {
+/* Encadeia, como as demais telas: este arquivo substituía o gancho sem chamar
+   o anterior, e apagava em silêncio o de quem tivesse carregado antes dele. */
+const aposRenderAlunos = Views.aposRender;
+Views.aposRender = (rota, param) => {
+  if (aposRenderAlunos) aposRenderAlunos(rota, param);
   if (rota === "alunos") {
     const campo = document.getElementById("busca-aluno");
     if (campo) {

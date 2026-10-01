@@ -3,7 +3,7 @@
    quando há internet), com fallback para o cache quando offline. */
 "use strict";
 
-const CACHE = "bzn-painel-v28";
+const CACHE = "bzn-painel-v29";
 const ESSENCIAIS = [
   "./",
   "./index.html",
