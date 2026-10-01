@@ -8,6 +8,67 @@ function pillTurma(status) {
   return `<span class="pill ${cls}">${U.esc(status)}</span>`;
 }
 
+/* Turma sem professor é turma invisível para quem vai dar a aula: ele entra,
+   encontra a área vazia e conclui que o sistema é só de leitura. Resolver isso
+   turma a turma era o caminho que ninguém percorria, então o pendente vem para
+   a frente da tela, com tudo resolvível de uma vez só. */
+function painelSemProfessor() {
+  if (!(App.ehAdmin() || App.nivel() === "secretaria")) return "";
+  const soltas = Store.col("turmas").filter(t => !t.professorId);
+  if (!soltas.length) return "";
+
+  const profs = U.ordenarPorNome(Store.col("professores"));
+  if (!profs.length) {
+    return `
+      <div class="panel">
+        <div class="alert-box warn"><span class="ico">&#9888;&#65039;</span><div>
+          <strong>${soltas.length} ${U.plural(soltas.length, "turma está", "turmas estão")} sem professor</strong>
+          <p>Antes de vincular, cadastre os professores na aba <strong>Profissionais</strong>.</p>
+        </div></div>
+      </div>`;
+  }
+
+  const opcoes = p => profs.map(x =>
+    `<option value="${x.id}">${U.esc(x.nome)}</option>`).join("");
+
+  return `
+    <div class="panel">
+      <h3>&#9888;&#65039; ${soltas.length} ${U.plural(soltas.length, "turma sem professor", "turmas sem professor")}</h3>
+      <p class="panel-sub">Enquanto a turma não tiver professor, ela não aparece na área dele e ninguém consegue fazer a chamada. Escolha e salve tudo de uma vez.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Curso</th><th>Turma</th><th>Horário</th><th>Status</th><th>Professor</th></tr></thead>
+        <tbody>${soltas.map(t => {
+          const c = Store.get("cursos", t.cursoId);
+          return `<tr>
+            <td><span class="chip cor-${c ? c.corIndex : 8}">${U.esc(c ? c.nome : "—")}</span></td>
+            <td>${U.esc(t.nome)}</td>
+            <td>${U.esc(t.horario || "—")}</td>
+            <td>${pillTurma(t.status)}</td>
+            <td><select class="sel-vinculo" data-turma="${t.id}">
+              <option value="">— escolher —</option>${opcoes(t)}
+            </select></td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>
+      <div class="form-actions">
+        <button class="btn accent" data-action="salvarVinculosTurmas">Salvar vínculos</button>
+      </div>
+    </div>`;
+}
+
+/* Grava só o que foi escolhido: deixar algumas em branco e voltar depois é um
+   uso legítimo, não um erro. */
+Actions.salvarVinculosTurmas = () => {
+  const escolhas = [...document.querySelectorAll(".sel-vinculo")].filter(s => s.value);
+  if (!escolhas.length) { U.toast("Escolha ao menos um professor."); return; }
+  escolhas.forEach(sel => {
+    const t = Store.get("turmas", sel.dataset.turma);
+    if (t) Store.upsert("turmas", { ...t, professorId: sel.value });
+  });
+  U.toast(`${escolhas.length} ${U.plural(escolhas.length, "turma vinculada", "turmas vinculadas")}.`);
+  App.render();
+};
+
 Views.turmas = () => {
   const turmas = [...Store.col("turmas")].sort((a, b) => (b.dataInicio || "").localeCompare(a.dataInicio || ""));
   const linhas = turmas.map(t => {
@@ -35,6 +96,7 @@ Views.turmas = () => {
   }).join("");
 
   return `
+    ${painelSemProfessor()}
     <div class="page-head">
       <div>
         <h2>Turmas</h2>
@@ -63,7 +125,7 @@ Views.turmas = () => {
 function abrirFormTurma(t) {
   const cursosOpts = U.ordenarPorNome(Store.col("cursos")).map(c =>
     `<option value="${c.id}" ${t.cursoId === c.id ? "selected" : ""}>${U.esc(c.nome)}</option>`).join("");
-  const profOpts = ['<option value="">— sem professor —</option>']
+  const profOpts = ['<option value="">— escolha o professor —</option>']
     .concat(U.ordenarPorNome(Store.col("professores")).map(p =>
       `<option value="${p.id}" ${t.professorId === p.id ? "selected" : ""}>${U.esc(p.nome)}</option>`)).join("");
   const statusOpts = STATUS_TURMA.map(s =>
@@ -84,8 +146,8 @@ function abrirFormTurma(t) {
           <input id="ft-nome" name="nome" required placeholder="ex.: Turma A" value="${U.esc(t.nome)}">
         </div>
         <div class="field">
-          <label for="ft-prof">Professor</label>
-          <select id="ft-prof" name="professorId">${profOpts}</select>
+          <label for="ft-prof">Professor *</label>
+          <select id="ft-prof" name="professorId" required>${profOpts}</select>
         </div>
         <div class="field">
           <label for="ft-status">Status</label>
@@ -118,6 +180,13 @@ function abrirFormTurma(t) {
       </div>
     </form>`, dados => {
     if (!dados.nome.trim() || !dados.cursoId) return false;
+    /* turma sem professor era o buraco por onde a área dele abria vazia:
+       o navegador já barra pelo required, e isto fecha o caminho de quem
+       chega aqui por outro lado */
+    if (!dados.professorId) {
+      alert("Escolha o professor desta turma.\n\nSem isso ele não encontra a turma na área dele e não consegue fazer a chamada.");
+      return false;
+    }
     Store.upsert("turmas", {
       id: t.id || undefined, ...dados,
       nome: dados.nome.trim(),
