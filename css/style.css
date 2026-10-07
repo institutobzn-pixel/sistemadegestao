@@ -616,3 +616,12 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin-top: 2px;
 }
+
+/* Chamada: presença e, para a secretaria, os comandos de ficha e matrícula.
+   Agrupados à direita para não disputarem espaço com o nome do aluno. */
+.chamada-acoes { display: flex; align-items: center; gap: 4px; flex: none; }
+.chamada-acoes .presenca-toggle { margin-right: 4px; }
+@media (max-width: 520px) {
+  .chamada-aluno { flex-wrap: wrap; }
+  .chamada-acoes { width: 100%; justify-content: flex-end; }
+}

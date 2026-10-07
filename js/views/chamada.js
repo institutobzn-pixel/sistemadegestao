@@ -83,6 +83,10 @@ Views.chamada = turmaIdParam => {
   if (turmaSel) {
     const mats = Store.matriculasDaTurma(turmaSel.id).filter(m => m.status === "cursando" || m.status === "concluido");
     const alunos = U.ordenarPorNome(mats.map(m => Store.get("alunos", m.alunoId)).filter(Boolean));
+    const matriculaDe = new Map(mats.map(m => [m.alunoId, m.id]));
+    /* Mexer na matrícula é da secretaria, não de quem dá a aula: o professor
+       marca presença e nada mais. */
+    const podeMexer = App.ehAdmin() || App.nivel() === "secretaria";
 
     // chamada já registrada nesta data?
     const existente = Store.col("chamadas").find(c => c.turmaId === turmaSel.id && c.data === chamadaAtual.data);
@@ -103,9 +107,14 @@ Views.chamada = turmaIdParam => {
               </div>
             </div>
           </div>
-          <div class="presenca-toggle" data-aluno="${a.id}">
-            <button type="button" class="tp ${marcado === true ? "sel-p" : ""}" data-v="1" ${travado ? "disabled" : ""}>Presente</button>
-            <button type="button" class="tf ${marcado === false ? "sel-f" : ""}" data-v="0" ${travado ? "disabled" : ""}>Falta</button>
+          <div class="chamada-acoes">
+            <div class="presenca-toggle" data-aluno="${a.id}">
+              <button type="button" class="tp ${marcado === true ? "sel-p" : ""}" data-v="1" ${travado ? "disabled" : ""}>Presente</button>
+              <button type="button" class="tf ${marcado === false ? "sel-f" : ""}" data-v="0" ${travado ? "disabled" : ""}>Falta</button>
+            </div>
+            ${podeMexer ? `
+            <button class="icon-btn" data-action="editarAluno" data-id="${a.id}" title="Editar a ficha de ${U.esc(a.nome)}" aria-label="Editar aluno">&#9998;</button>
+            <button class="icon-btn" data-action="tirarDaTurma" data-id="${matriculaDe.get(a.id) || ""}" title="Tirar ${U.esc(a.nome)} desta turma" aria-label="Tirar da turma">&#128465;</button>` : ""}
           </div>
         </div>`;
     }).join("") : `<div class="empty-note">Nenhum aluno matriculado nesta turma.<br>Matricule alunos pela ficha de cada aluno.</div>`;
@@ -393,6 +402,25 @@ Actions.csvChamadaTurma = () => {
   U.baixarArquivo(`${nome}.csv`, "\ufeff" + [U.linhaCSV(cab), ...linhas].join("\n"),
     "text/csv;charset=utf-8");
   U.toast("Lista de chamada baixada.");
+};
+
+/* Tira o aluno desta turma. Não apaga o aluno do instituto nem as presenças
+   que ele já tem: o histórico fica guardado, ele só deixa de aparecer nesta
+   chamada. Se voltar a ser matriculado, as presenças antigas reaparecem. */
+Actions.tirarDaTurma = matId => {
+  if (!(App.ehAdmin() || App.nivel() === "secretaria")) {
+    U.toast("Mexer na matrícula é da secretaria."); return;
+  }
+  const m = Store.col("matriculas").find(x => x.id === matId);
+  if (!m) return;
+  const aluno = Store.get("alunos", m.alunoId);
+  const turma = Store.get("turmas", m.turmaId);
+  const nome = aluno ? aluno.nome : "este aluno";
+  if (!confirm(`Tirar ${nome} da turma ${turma ? turma.nome : ""}?\n\n` +
+    `Ele deixa de aparecer nesta chamada. O cadastro dele e as presenças já lançadas continuam guardados.`)) return;
+  Store.remover("matriculas", matId);
+  U.toast(`${nome.split(" ")[0]} saiu desta turma.`);
+  App.render();
 };
 
 Actions.destravarChamada = () => {
