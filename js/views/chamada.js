@@ -1,7 +1,13 @@
 /* Lista de chamada: registro de presença por turma e data */
 "use strict";
 
-let chamadaAtual = { turmaId: "", data: U.hojeISO(), conteudo: "", presencas: {} };
+let chamadaAtual = { turmaId: "", data: U.hojeISO(), conteudo: "", presencas: {}, fotos: [] };
+
+/* Sete fotos por aula, comprimidas com mais força do que as do curso: o banco
+   inteiro viaja num bloco só, e foto é o que mais pesa nele. */
+const MAX_FOTOS_AULA = 7;
+const LADO_FOTO_AULA = 800;
+const QUALIDADE_FOTO_AULA = 0.6;
 
 /* Uma aula já lançada abre trancada. Antes bastava um toque a mais na tela
    para trocar presença por falta sem ninguém perceber — e a chamada é o que
@@ -52,11 +58,11 @@ Views.chamada = turmaIdParam => {
   }
   /* turma que sobrou de outra sessão e não pertence a esta pessoa */
   if (chamadaAtual.turmaId && !podeChamarTurma(chamadaAtual.turmaId)) {
-    chamadaAtual = { turmaId: "", data: U.hojeISO(), conteudo: "", presencas: {} };
+    chamadaAtual = { turmaId: "", data: U.hojeISO(), conteudo: "", presencas: {}, fotos: [] };
   }
 
   if (turmaIdParam && chamadaAtual.turmaId !== turmaIdParam) {
-    chamadaAtual = { turmaId: turmaIdParam, data: U.hojeISO(), conteudo: "", presencas: {} };
+    chamadaAtual = { turmaId: turmaIdParam, data: U.hojeISO(), conteudo: "", presencas: {}, fotos: [] };
     chamadaDestravada = false;   // trocou de turma: tranca de novo
   }
   if (!chamadaAtual.turmaId && turmas.length) chamadaAtual.turmaId = turmas[0].id;
@@ -92,6 +98,8 @@ Views.chamada = turmaIdParam => {
     const existente = Store.col("chamadas").find(c => c.turmaId === turmaSel.id && c.data === chamadaAtual.data);
     const presencas = existente ? existente.presencas : chamadaAtual.presencas;
     aulaJaExiste = !!existente;
+    /* as fotos vêm da aula gravada; numa aula nova ficam na memória até salvar */
+    if (existente) chamadaAtual.fotos = existente.fotos || [];
 
     listaAlunos = alunos.length ? alunos.map(a => {
       const marcado = presencas[a.id];
@@ -195,7 +203,24 @@ Views.chamada = turmaIdParam => {
           ? `<button class="btn accent" data-action="destravarChamada">&#9998; Editar presenças</button>`
           : `<button class="btn accent" data-action="salvarChamada">${aulaJaExiste ? "Atualizar aula" : "Salvar aula"}</button>`}
       </div>
+
+      <div class="fotos-aula">
+        <div class="fotos-aula-topo">
+          <strong>Fotos desta aula</strong>
+          <span>${(chamadaAtual.fotos || []).length} de ${MAX_FOTOS_AULA}</span>
+        </div>
+        ${(chamadaAtual.fotos || []).length ? `<div class="foto-strip">${chamadaAtual.fotos.map((f, i) =>
+          `<span class="foto-aula-item">
+             <img src="${f}" alt="Foto ${i + 1} desta aula" loading="lazy" data-action="verFotoAula" data-id="${i}">
+             <button class="foto-remover" data-action="removerFotoAula" data-id="${i}" title="Remover esta foto" aria-label="Remover foto">&#10005;</button>
+           </span>`).join("")}</div>`
+          : `<p class="panel-sub" style="margin:0 0 8px;">Nenhuma foto nesta aula ainda.</p>`}
+        <button class="btn ghost sm" data-action="addFotoAula">&#128247; Adicionar fotos</button>
+        ${aulaJaExiste ? "" : `<span style="font-size:0.78rem; color:var(--text-muted); margin-left:8px;">serão gravadas junto com a aula</span>`}
+      </div>
     </div>
+
+    <input type="file" id="aula-foto-input" accept="image/*" multiple hidden>
 
     <div class="panel">
       <div class="head-actions" style="justify-content:space-between; align-items:center; width:100%;">
@@ -223,7 +248,7 @@ Views.aposRender = (rota, param) => {
   if (!selTurma) return;
 
   selTurma.addEventListener("change", () => {
-    chamadaAtual = { turmaId: selTurma.value, data: inpData.value, conteudo: "", presencas: {} };
+    chamadaAtual = { turmaId: selTurma.value, data: inpData.value, conteudo: "", presencas: {}, fotos: [] };
     chamadaDestravada = false;
     location.hash = "#/chamada/" + selTurma.value;
     App.render();
@@ -238,10 +263,33 @@ Views.aposRender = (rota, param) => {
     if (v === chamadaAtual.data) return;
     chamadaAtual.data = v;
     chamadaAtual.presencas = {};
+    chamadaAtual.fotos = [];
     chamadaDestravada = false;   // outra data, outra aula: tranca de novo
     App.render();
   });
   if (inpCont) inpCont.addEventListener("input", () => { chamadaAtual.conteudo = inpCont.value; });
+
+  const inpFoto = document.getElementById("aula-foto-input");
+  if (inpFoto) inpFoto.onchange = async () => {
+    const arquivos = [...inpFoto.files];
+    inpFoto.value = "";
+    if (!arquivos.length || !podeChamarTurma(chamadaAtual.turmaId)) return;
+    if (!chamadaAtual.fotos) chamadaAtual.fotos = [];
+    let novas = 0;
+    for (const arq of arquivos) {
+      if (chamadaAtual.fotos.length >= MAX_FOTOS_AULA) { U.toast(`Limite de ${MAX_FOTOS_AULA} fotos por aula.`); break; }
+      if (!arq.type.startsWith("image/")) { U.toast(`"${arq.name}" não é uma imagem.`); continue; }
+      try {
+        chamadaAtual.fotos.push(await U.comprimirImagem(arq, LADO_FOTO_AULA, QUALIDADE_FOTO_AULA));
+        novas++;
+      } catch (e) { U.toast(`Não foi possível ler "${arq.name}".`); }
+    }
+    if (!novas) return;
+    gravarFotosDaAula();
+    U.toast(`${novas} ${U.plural(novas, "foto adicionada", "fotos adicionadas")}.`);
+    avisarEspaco();
+    App.render();
+  };
 
   document.querySelectorAll(".presenca-toggle").forEach(tg => {
     const alunoId = tg.dataset.aluno;
@@ -278,10 +326,16 @@ Actions.salvarChamada = () => {
     else presencas[m.alunoId] = true;
   }
 
-  Store.upsert("chamadas", {
-    id: existente ? existente.id : undefined,
-    turmaId: turma.id, data, conteudo, presencas
-  });
+  try {
+    Store.upsert("chamadas", {
+      id: existente ? existente.id : undefined,
+      turmaId: turma.id, data, conteudo, presencas,
+      fotos: (chamadaAtual.fotos || []).slice(0, MAX_FOTOS_AULA)
+    });
+  } catch (e) {
+    alert("Não foi possível salvar: o armazenamento do navegador está cheio.\n\nRemova algumas fotos desta aula e tente de novo.");
+    return;
+  }
   chamadaAtual.presencas = {};
   U.toast(existente ? "Chamada atualizada." : "Chamada salva.");
   chamadaDestravada = false;   // gravou: volta a ficar protegida
@@ -422,6 +476,81 @@ Actions.tirarDaTurma = matId => {
   U.toast(`${nome.split(" ")[0]} saiu desta turma.`);
   App.render();
 };
+
+Actions.addFotoAula = () => {
+  if (!podeChamarTurma(chamadaAtual.turmaId)) { U.toast("Esta turma não é sua."); return; }
+  if ((chamadaAtual.fotos || []).length >= MAX_FOTOS_AULA) {
+    U.toast(`Limite de ${MAX_FOTOS_AULA} fotos por aula.`); return;
+  }
+  const inp = document.getElementById("aula-foto-input");
+  if (inp) inp.click();
+};
+
+Actions.verFotoAula = idx => {
+  const fotos = chamadaAtual.fotos || [];
+  let i = Number(idx) || 0;
+  if (!fotos[i]) return;
+  App.abrirModal("Foto da aula", `
+    <div style="text-align:center;">
+      <img id="fa-img" src="${fotos[i]}" alt="Foto desta aula" style="max-width:100%; max-height:70vh; border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+        <button type="button" class="btn ghost sm" id="fa-ant" ${fotos.length < 2 ? "hidden" : ""}>&larr; Anterior</button>
+        <span id="fa-cont" style="font-size:0.8rem; color:var(--text-muted);">${i + 1} de ${fotos.length}</span>
+        <button type="button" class="btn ghost sm" id="fa-prox" ${fotos.length < 2 ? "hidden" : ""}>Próxima &rarr;</button>
+      </div>
+    </div>`);
+  const mostrar = () => {
+    document.getElementById("fa-img").src = fotos[i];
+    document.getElementById("fa-cont").textContent = `${i + 1} de ${fotos.length}`;
+  };
+  const ant = document.getElementById("fa-ant");
+  const prox = document.getElementById("fa-prox");
+  if (ant) ant.onclick = () => { i = (i - 1 + fotos.length) % fotos.length; mostrar(); };
+  if (prox) prox.onclick = () => { i = (i + 1) % fotos.length; mostrar(); };
+};
+
+/* Remover é de quem pode lançar aquela chamada: a foto é o registro da aula
+   dessa pessoa, e uma foto tremida presa para sempre não ajuda ninguém. */
+Actions.removerFotoAula = idx => {
+  if (!podeChamarTurma(chamadaAtual.turmaId)) { U.toast("Esta turma não é sua."); return; }
+  const i = Number(idx);
+  const fotos = chamadaAtual.fotos || [];
+  if (!fotos[i]) return;
+  if (!confirm("Remover esta foto da aula?")) return;
+  fotos.splice(i, 1);
+  gravarFotosDaAula();
+  App.render();
+};
+
+/* Numa aula já gravada, a mudança nas fotos vai para o banco na hora — senão
+   a pessoa adiciona, troca de data e perde o que subiu. */
+function gravarFotosDaAula() {
+  const turma = Store.get("turmas", chamadaAtual.turmaId);
+  if (!turma) return;
+  const existente = Store.col("chamadas").find(c => c.turmaId === turma.id && c.data === chamadaAtual.data);
+  if (!existente) return;   // aula nova: as fotos seguem com o Salvar aula
+  try {
+    Store.upsert("chamadas", { ...existente, fotos: (chamadaAtual.fotos || []).slice(0, MAX_FOTOS_AULA) });
+  } catch (e) {
+    alert("Não foi possível salvar as fotos: o armazenamento do navegador está cheio.");
+  }
+}
+
+/* O navegador guarda o sistema inteiro num bloco só, e foto é o que mais pesa
+   nele. O teto costuma ficar perto de 5 MB; passar disso faz o app recusar
+   gravações. Avisar a 3,5 MB dá tempo de agir — descobrir no limite significa
+   uma chamada que não salva no meio da aula. */
+let avisouEspaco = false;
+function avisarEspaco() {
+  if (avisouEspaco) return;
+  let mb;
+  try { mb = Store.exportarJSON().length / (1024 * 1024); } catch (e) { return; }
+  if (mb < 3.5) return;
+  avisouEspaco = true;
+  alert(`Atenção: o sistema já ocupa ${mb.toFixed(1)} MB neste navegador, e o limite fica perto de 5 MB.\n\n` +
+    `As fotos são o que mais pesa. Avise a administração antes que o espaço acabe — ` +
+    `quando acabar, o app para de salvar.`);
+}
 
 Actions.destravarChamada = () => {
   chamadaDestravada = true;

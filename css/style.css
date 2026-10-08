@@ -625,3 +625,23 @@ footer.foot svg { width: 18px; height: 18px; color: var(--navy); }
   .chamada-aluno { flex-wrap: wrap; }
   .chamada-acoes { width: 100%; justify-content: flex-end; }
 }
+
+/* Fotos da aula, dentro da própria chamada: registro do dia, separado da
+   galeria do curso. O X de remover só aparece ao passar o dedo/mouse, para
+   não virar um alvo acidental em cima da miniatura. */
+.fotos-aula { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.fotos-aula-topo {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; margin-bottom: 8px; font-size: 0.88rem;
+}
+.fotos-aula-topo span { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.foto-aula-item { position: relative; display: inline-block; line-height: 0; }
+.foto-aula-item .foto-remover {
+  position: absolute; top: 3px; right: 3px;
+  background: rgba(0, 0, 0, 0.62); color: #fff; border: none;
+  border-radius: 50%; width: 20px; height: 20px; line-height: 1;
+  font-size: 0.72rem; cursor: pointer; opacity: 0; transition: opacity 0.15s;
+}
+.foto-aula-item:hover .foto-remover,
+.foto-aula-item:focus-within .foto-remover { opacity: 1; }
+@media (hover: none) { .foto-aula-item .foto-remover { opacity: 1; } }
