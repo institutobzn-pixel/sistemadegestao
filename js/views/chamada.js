@@ -389,14 +389,28 @@ Actions.confirmarAddAlunos = () => {
   if (!turma) return;
   const jaNaTurma = new Set(Store.matriculasDaTurma(turma.id).map(m => m.alunoId));
   let add = 0;
-  // marcados
-  document.querySelectorAll(".add-al:checked").forEach(ch => {
-    if (!jaNaTurma.has(ch.value)) {
-      Store.upsert("matriculas", { alunoId: ch.value, turmaId: turma.id, status: "cursando", data: U.hojeISO(), bolsa: false });
-      jaNaTurma.add(ch.value);
-      add++;
+  const faltaram = [];   // quem não entrou, para dizer o nome em vez de sumir
+
+  /* Cada gravação pode esbarrar no espaço do navegador. Antes, o erro cru
+     interrompia o laço e os nomes seguintes sumiam sem aviso. */
+  const matricular = (alunoId, nome) => {
+    if (jaNaTurma.has(alunoId)) return true;
+    try {
+      Store.upsert("matriculas", { alunoId, turmaId: turma.id, status: "cursando", data: U.hojeISO(), bolsa: false });
+    } catch (e) {
+      faltaram.push(nome);
+      return false;
     }
-  });
+    jaNaTurma.add(alunoId);
+    add++;
+    return true;
+  };
+
+  // marcados
+  for (const ch of document.querySelectorAll(".add-al:checked")) {
+    const a = Store.get("alunos", ch.value);
+    matricular(ch.value, a ? a.nome : "(sem nome)");
+  }
   // nomes novos
   const nomes = (document.getElementById("add-novos").value || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
   const idx = new Map();
@@ -404,21 +418,27 @@ Actions.confirmarAddAlunos = () => {
   for (const nome of nomes) {
     let aluno = idx.get(nome.toLowerCase());
     if (!aluno) {
+      try {
       aluno = Store.upsert("alunos", {
         nome, nascimento: "", cpf: "", telefone: "", email: "", endereco: "", bairro: "", cidade: "", cep: "",
         responsavel: "", encaminhamento: "", atingidoEnchente: "", impactoEnchentes: "", rendaFamiliar: "",
         beneficios: "", moradiaAtual: "", necessidades: "", observacoes: "", termos: []
       });
+      } catch (e) { faltaram.push(nome); continue; }
       idx.set(nome.toLowerCase(), aluno);
     }
-    if (!jaNaTurma.has(aluno.id)) {
-      Store.upsert("matriculas", { alunoId: aluno.id, turmaId: turma.id, status: "cursando", data: U.hojeISO(), bolsa: false });
-      jaNaTurma.add(aluno.id);
-      add++;
-    }
+    matricular(aluno.id, aluno.nome);
   }
   App.fecharModal();
   App.render();
+  if (faltaram.length) {
+    alert(`${add} ${U.plural(add, "aluno entrou", "alunos entraram")} na turma, mas ` +
+      `${faltaram.length} não ${U.plural(faltaram.length, "entrou", "entraram")}:\n\n` +
+      faltaram.join("\n") +
+      `\n\nO armazenamento deste navegador está cheio (${Store.espacoUsadoMB().toFixed(1)} MB). ` +
+      `Para abrir espaço, remova fotos de aulas antigas — são elas que mais pesam.`);
+    return;
+  }
   U.toast(add ? `${add} ${U.plural(add, "aluno adicionado", "alunos adicionados")} à turma.` : "Nenhum aluno novo para adicionar.");
 };
 

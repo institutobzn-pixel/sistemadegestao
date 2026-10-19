@@ -375,8 +375,26 @@ const Store = (() => {
     return n;
   }
 
+  /* O navegador recusa a gravação quando o espaço acaba. Deixar o erro cru
+     subir fazia um laço de gravações parar no meio sem dizer nada — metade
+     dos alunos entrava, metade não. Aqui ele vira um erro reconhecível, para
+     quem chamou saber o que aconteceu e contar para a pessoa. */
   function gravarLocal() {
-    localStorage.setItem(KEY, JSON.stringify(db));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(db));
+    } catch (e) {
+      const cheio = e && (e.name === "QuotaExceededError" ||
+        e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014);
+      if (!cheio) throw e;
+      const err = new Error("O armazenamento deste navegador está cheio.");
+      err.semEspaco = true;
+      throw err;
+    }
+  }
+
+  /* Quanto o sistema ocupa hoje, em MB. Serve para avisar antes da parede. */
+  function espacoUsadoMB() {
+    try { return JSON.stringify(db).length / (1024 * 1024); } catch (e) { return 0; }
   }
 
   function salvar() {
@@ -1050,7 +1068,7 @@ const Store = (() => {
     enchenteGeral, encaminhamentoGeral, resumoGratuidade, condicaoAluno,
     contas, contaPorEmail, salvarConta, removerConta,
     exportarJSON, importarJSON, limparTudo,
-    snapshot, aplicarRemoto,
+    snapshot, aplicarRemoto, espacoUsadoMB,
     get config() { return db.config; }
   };
 })();
