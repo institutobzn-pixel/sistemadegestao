@@ -59,12 +59,12 @@ const App = (() => {
   const nivel = () => sessionStorage.getItem(CHAVE_NIVEL) || "";
 
   /* ---------- expiração por inatividade ----------
-     Quinze minutos sem operar e a sessão cai, como nos aplicativos de banco.
+     Meia hora sem operar e a sessão cai, como nos aplicativos de banco.
      Não substitui o bloqueio de tela do aparelho — se alguém pegar o celular
      destravado dentro da janela, entra —, mas encurta muito essa janela.
      O carimbo fica no sessionStorage: morre junto com a sessão, e não deixa
      rastro de uso no aparelho. */
-  const LIMITE_INATIVIDADE = 15 * 60 * 1000;
+  const LIMITE_INATIVIDADE = 30 * 60 * 1000;
   const K_ULTIMO_USO = "bzn-ultimo-uso";
 
   function sessaoAberta() {
